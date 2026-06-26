@@ -1,4 +1,4 @@
-﻿// --- Store Logic ---
+// --- Store Logic ---
 class Store {
   constructor() {
     const storedRoutines = JSON.parse(localStorage.getItem('routines'));
@@ -73,10 +73,6 @@ class Store {
         ex.basicRest = Math.round(ex.basicRest * 60);
         ex.specialRest = Math.round(ex.specialRest * 60);
         ex.maxRest = ex.specialRest; 
-        needsSave = true;
-      }
-      if (typeof ex.interRest !== 'number') {
-        ex.interRest = 120;
         needsSave = true;
       }
       return ex;
@@ -429,6 +425,191 @@ function makeListSortable(listContainer, onReorder) {
   listContainer.addEventListener('touchstart', mouseDownHandler, { passive: false });
 }
 
+// --- Timer Tab ---
+function renderTimerTab() {
+  const container = document.createElement('div');
+  container.className = 'tab-pane';
+  container.id = 'tab-timer';
+
+  container.innerHTML = `
+    <h1 class="page-title">타이머</h1>
+    <div class="timer-container">
+      <svg class="timer-svg" viewBox="0 0 100 100">
+        <circle class="timer-circle-bg" cx="50" cy="50" r="45"></circle>
+        <circle class="timer-circle-progress" cx="50" cy="50" r="45" stroke-dasharray="283" stroke-dashoffset="0"></circle>
+      </svg>
+      <div class="timer-text" id="timer-display">00:00</div>
+      <div class="timer-label" id="timer-type">대기 중</div>
+    </div>
+    
+    <div id="timer-controls">
+      <button class="btn btn-accent" id="btn-add-rest" style="display: none; margin-bottom: 12px;">+ 추가 휴식 (특수 휴식 전환)</button>
+      <button class="btn btn-danger" id="btn-stop-timer" style="display: none;">타이머 종료</button>
+    </div>
+
+    <div id="timer-finished-options" style="display: none; margin-top: 20px;">
+      <p style="text-align: center; margin-bottom: 10px; color: var(--warning-color); font-weight: bold;">시간이 종료되었습니다!</p>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn btn-accent" id="btn-extend-rest">추가 휴식</button>
+        <button class="btn btn-secondary" id="btn-close-timer">끄기</button>
+      </div>
+    </div>
+  `;
+
+  const display = container.querySelector('#timer-display');
+  const typeLabel = container.querySelector('#timer-type');
+  const progressCircle = container.querySelector('.timer-circle-progress');
+  const btnAddRest = container.querySelector('#btn-add-rest');
+  const btnStop = container.querySelector('#btn-stop-timer');
+  const finishedOptions = container.querySelector('#timer-finished-options');
+  const btnExtend = container.querySelector('#btn-extend-rest');
+  const btnClose = container.querySelector('#btn-close-timer');
+  
+  const circumference = 2 * Math.PI * 45; 
+
+  let lastWasRunning = false;
+  let alarmPlayed = false;
+
+  const updateUI = (state) => {
+    const { isRunning, timeLeft, totalTime, type } = state.timer;
+    
+    const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+    const s = (timeLeft % 60).toString().padStart(2, '0');
+    display.textContent = `${m}:${s}`;
+
+    if (totalTime > 0) {
+      const offset = circumference - (timeLeft / totalTime) * circumference;
+      progressCircle.style.strokeDashoffset = offset;
+    } else {
+      progressCircle.style.strokeDashoffset = 0;
+    }
+
+    if (type === 'basic') {
+      progressCircle.style.stroke = 'var(--primary-color)';
+      typeLabel.textContent = '기본 휴식';
+    } else if (type === 'special') {
+      progressCircle.style.stroke = 'var(--warning-color)';
+      typeLabel.textContent = '특수 휴식';
+    } else if (type === 'max') {
+      progressCircle.style.stroke = 'var(--danger-color)';
+      typeLabel.textContent = '최대 휴식';
+    } else {
+      typeLabel.textContent = '대기 중';
+      progressCircle.style.stroke = 'var(--accent-color)';
+    }
+
+    if (isRunning) {
+      btnAddRest.style.display = type === 'max' ? 'none' : 'block';
+      if (type === 'basic') btnAddRest.textContent = '+ 특수 휴식으로 연장';
+      else if (type === 'special') btnAddRest.textContent = '+ 최대 휴식으로 연장';
+      btnStop.style.display = 'block';
+      finishedOptions.style.display = 'none';
+      lastWasRunning = true;
+      alarmPlayed = false;
+    } else {
+      btnAddRest.style.display = 'none';
+      btnStop.style.display = 'none';
+      
+      if (lastWasRunning && timeLeft === 0) {
+        finishedOptions.style.display = 'block';
+        btnExtend.style.display = type === 'max' ? 'none' : 'block';
+        if (type === 'basic') btnExtend.textContent = '특수 휴식으로 연장';
+        else if (type === 'special') btnExtend.textContent = '최대 휴식으로 연장';
+        if (!alarmPlayed) {
+          const alarm = document.getElementById('alarm-sound');
+          if (alarm) {
+            alarm.currentTime = 0;
+            alarm.play().catch(e => console.log("Audio play blocked", e));
+          }
+          alarmPlayed = true;
+        }
+      } else if (timeLeft === 0) {
+        finishedOptions.style.display = 'none';
+      }
+    }
+  };
+
+  store.subscribe(updateUI);
+  setTimeout(() => updateUI(store.state), 0);
+
+  btnAddRest.addEventListener('click', () => {
+    const workout = store.state.workout;
+    let addedTime = 60; 
+    let nextType = 'special';
+    
+    if (workout.isRecording) {
+      const schedule = store.state.schedule[workout.selectedDay];
+      const currentScheduleItem = schedule[workout.currentExerciseIndex];
+      if (currentScheduleItem) {
+        const exercise = store.state.exercises.find(e => e.id === currentScheduleItem.exerciseId);
+        if (exercise) {
+          if (store.state.timer.type === 'basic') {
+            addedTime = Math.max(0, exercise.specialRest - exercise.basicRest);
+            nextType = 'special';
+          } else if (store.state.timer.type === 'special') {
+            addedTime = Math.max(0, exercise.maxRest - exercise.specialRest);
+            nextType = 'max';
+          }
+        }
+      }
+    } else {
+      if (store.state.timer.type === 'basic') nextType = 'special';
+      else nextType = 'max';
+    }
+    
+    if (addedTime > 0) {
+      store.addTimerTime(addedTime);
+      store.state.timer.type = nextType; 
+      store.notify();
+    }
+  });
+
+  btnStop.addEventListener('click', () => {
+    store.stopTimer();
+    const alarm = document.getElementById('alarm-sound');
+    if (alarm) { alarm.pause(); alarm.currentTime = 0; }
+  });
+
+  btnExtend.addEventListener('click', () => {
+    const workout = store.state.workout;
+    let addedTime = 60;
+    let nextType = 'special';
+    
+    if (workout.isRecording) {
+      const schedule = store.state.schedule[workout.selectedDay];
+      const currentScheduleItem = schedule[workout.currentExerciseIndex];
+      if (currentScheduleItem) {
+        const exercise = store.state.exercises.find(e => e.id === currentScheduleItem.exerciseId);
+        if (exercise) {
+          if (store.state.timer.type === 'basic') {
+            addedTime = Math.max(0, exercise.specialRest - exercise.basicRest);
+            nextType = 'special';
+          } else if (store.state.timer.type === 'special') {
+            addedTime = Math.max(0, exercise.maxRest - exercise.specialRest);
+            nextType = 'max';
+          }
+        }
+      }
+    } else {
+      if (store.state.timer.type === 'basic') nextType = 'special';
+      else nextType = 'max';
+    }
+    store.startTimer(addedTime, nextType);
+    finishedOptions.style.display = 'none';
+    const alarm = document.getElementById('alarm-sound');
+    if (alarm) { alarm.pause(); alarm.currentTime = 0; }
+  });
+
+  btnClose.addEventListener('click', () => {
+    store.stopTimer();
+    finishedOptions.style.display = 'none';
+    const alarm = document.getElementById('alarm-sound');
+    if (alarm) { alarm.pause(); alarm.currentTime = 0; }
+  });
+
+  return container;
+}
+
 // --- Exercises Tab ---
 function renderExercisesTab() {
   const container = document.createElement('div');
@@ -482,20 +663,9 @@ function renderExercisesTab() {
           </div>
         </div>
 
-        <div class="form-group" style="display: flex; align-items: center; gap: 20px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <label style="margin: 0; white-space: nowrap;">세트 수</label>
-            <input type="number" id="ex-sets" required min="1" value="5" style="width: 80px;">
-          </div>
-          <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
-            <label style="margin: 0; white-space: nowrap;">종목간 휴식</label>
-            <div style="display: flex; gap: 5px;">
-              <input type="number" id="ex-inter-m" min="0" value="2" style="width: 100%;">
-              <span style="align-self: center; white-space: nowrap;">분</span>
-              <input type="number" id="ex-inter-s" min="0" max="59" value="0" style="width: 100%;">
-              <span style="align-self: center; white-space: nowrap;">초</span>
-            </div>
-          </div>
+        <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+          <label style="margin: 0; white-space: nowrap;">세트 수</label>
+          <input type="number" id="ex-sets" required min="1" value="5" style="width: 80px;">
         </div>
 
         <div class="checkbox-group" style="align-items: center; justify-content: space-between; flex-wrap: wrap;">
@@ -557,8 +727,6 @@ function renderExercisesTab() {
   const maxM = container.querySelector('#ex-max-m');
   const maxS = container.querySelector('#ex-max-s');
   const setsInput = container.querySelector('#ex-sets');
-  const interM = container.querySelector('#ex-inter-m');
-  const interS = container.querySelector('#ex-inter-s');
 
   const jcupCheck = container.querySelector('#ex-has-jcup');
   const jcupInput = container.querySelector('#ex-jcup-val');
@@ -596,7 +764,6 @@ function renderExercisesTab() {
     specialM.value = "3"; specialS.value = "0";
     maxM.value = "5"; maxS.value = "0";
     setsInput.value = "5";
-    interM.value = "2"; interS.value = "0";
     categorySelect.value = '';
   };
 
@@ -612,7 +779,6 @@ function renderExercisesTab() {
       specialRest: parseInt(specialM.value || 0)*60 + parseInt(specialS.value || 0),
       maxRest: parseInt(maxM.value || 0)*60 + parseInt(maxS.value || 0),
       sets: parseInt(setsInput.value, 10),
-      interRest: parseInt(interM.value || 0)*60 + parseInt(interS.value || 0),
       hasJCup: jcupCheck.checked,
       jcupValue: jcupCheck.checked ? jcupInput.value : null,
       hasSafebar: safebarCheck.checked,
@@ -641,8 +807,6 @@ function renderExercisesTab() {
     maxM.value = Math.floor(ex.maxRest / 60);
     maxS.value = ex.maxRest % 60;
     setsInput.value = ex.sets;
-    interM.value = Math.floor((ex.interRest ?? 120) / 60);
-    interS.value = (ex.interRest ?? 120) % 60;
     
     jcupCheck.checked = ex.hasJCup;
     jcupInput.disabled = !ex.hasJCup;
@@ -687,8 +851,7 @@ function renderExercisesTab() {
             <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 2px;">
               기본 휴식: ${Math.floor(ex.basicRest/60)}분 ${ex.basicRest%60}초<br>
               특수 휴식: ${Math.floor(ex.specialRest/60)}분 ${ex.specialRest%60}초<br>
-              최대 휴식: ${Math.floor(ex.maxRest/60)}분 ${ex.maxRest%60}초<br>
-              종목간 휴식: ${Math.floor((ex.interRest ?? 120)/60)}분 ${(ex.interRest ?? 120)%60}초
+              최대 휴식: ${Math.floor(ex.maxRest/60)}분 ${ex.maxRest%60}초
             </p>
             <p style="font-size: 0.75rem; color: var(--primary-color); margin-top: 4px;">
               ${ex.hasJCup ? `J-Cup: ${ex.jcupValue || '미지정'} ` : ''}${ex.hasSafebar ? `세이프바: ${ex.safebarValue || '미지정'}` : ''}
@@ -807,8 +970,11 @@ function renderScheduleTab() {
       <h3 style="margin-bottom: 12px; font-size: 1rem;">현재 루틴에 운동 추가</h3>
       <div style="display: flex; gap: 10px;">
         <select id="schedule-exercise-select" style="flex: 1; padding: 10px; border-radius: 8px; background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color);"></select>
+        <input type="number" id="schedule-target-weight" placeholder="중량(kg)" style="width: 80px; padding: 10px; border-radius: 8px; background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color);">
+        <input type="text" id="schedule-target-reps" placeholder="횟수" style="width: 70px; padding: 10px; border-radius: 8px; background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color);">
         <div style="display: flex; gap: 5px;">
           <button id="btn-add-schedule" class="btn" style="width: auto;">추가</button>
+          <button id="btn-cancel-schedule-edit" class="btn btn-secondary" style="width: auto; display: none;">취소</button>
         </div>
       </div>
     </div>
@@ -827,16 +993,19 @@ function renderScheduleTab() {
   const targetRepsInput = container.querySelector('#schedule-target-reps');
   const targetWeightInput = container.querySelector('#schedule-target-weight');
   const btnAdd = container.querySelector('#btn-add-schedule');
-  
+  const btnCancelEdit = container.querySelector('#btn-cancel-schedule-edit');
   let editModeItemId = null;
   
   const resetScheduleForm = () => {
     editModeItemId = null;
+    targetRepsInput.value = '';
+    targetWeightInput.value = '';
     btnAdd.textContent = '추가';
     btnAdd.classList.remove('btn-accent');
+    btnCancelEdit.style.display = 'none';
   };
 
-  
+  btnCancelEdit.addEventListener('click', resetScheduleForm);
 
   const updateRoutineSelect = () => {
     routineSelect.innerHTML = store.state.routines.length === 0 
@@ -942,12 +1111,11 @@ function renderScheduleTab() {
           </div>
           <div style="flex: 1;">
             <h3 style="font-size: 1rem; margin-bottom: 4px;"><span style="color: var(--primary-color); margin-right: 8px;">${index + 1}</span> ${ex.name}</h3>
-            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 2px;">${ex.sets}세트</p>
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 2px;">목표: ${item.targetWeight ? item.targetWeight + 'kg / ' : ''}${item.targetReps}회 / ${ex.sets}세트</p>
             <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 2px;">
               기본 휴식: ${Math.floor(ex.basicRest/60)}분 ${ex.basicRest%60}초<br>
               특수 휴식: ${Math.floor(ex.specialRest/60)}분 ${ex.specialRest%60}초<br>
-              최대 휴식: ${Math.floor(ex.maxRest/60)}분 ${ex.maxRest%60}초<br>
-              종목간 휴식: ${Math.floor((ex.interRest ?? 120)/60)}분 ${(ex.interRest ?? 120)%60}초
+              최대 휴식: ${Math.floor(ex.maxRest/60)}분 ${ex.maxRest%60}초
             </p>
             <p style="font-size: 0.75rem; color: var(--primary-color);">
               ${ex.hasJCup ? `J-Cup: ${ex.jcupValue || '미지정'} ` : ''}${ex.hasSafebar ? `세이프바: ${ex.safebarValue || '미지정'}` : ''}
@@ -1009,7 +1177,7 @@ function renderWorkoutTab() {
     
     <div id="workout-setup">
       <div class="card">
-        <h3 style="margin-bottom: 12px;">오늘 수행할 루틴</h3>
+        <h3 style="margin-bottom: 12px;">수행할 루틴 선택</h3>
         <select id="workout-routine-select" style="width: 100%; padding: 12px; border-radius: 8px; background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color); margin-bottom: 16px;"></select>
         <button id="btn-start-workout" class="btn btn-accent">운동 시작</button>
       </div>
@@ -1018,59 +1186,45 @@ function renderWorkoutTab() {
     <div id="workout-active" style="display: none;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-          <span style="color: var(--text-secondary); font-size: 0.875rem;">총 소요 시간</span>
-          <div id="total-stopwatch" style="font-size: 1.5rem; font-weight: bold; font-variant-numeric: tabular-nums;">00:00:00</div>
+          <span style="color: var(--text-secondary); font-size: 0.875rem;">전체 경과 시간</span>
+          <div id="total-stopwatch" style="font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums;">00:00:00</div>
         </div>
-        <button id="btn-finish-workout-early" class="btn btn-secondary" style="width: auto; border: 1px solid var(--danger-color); color: var(--danger-color); background: transparent;">운동 종료</button>
-      </div>
-
-      <div id="workout-timer-section" style="display: none; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 20px;">
-        <div style="position: relative; width: 250px; height: 250px;">
-          <svg class="timer-svg" viewBox="0 0 100 100" style="width: 100%; height: 100%; transform: rotate(-90deg);">
-            <circle cx="50" cy="50" r="45" fill="none" stroke="var(--border-color)" stroke-width="6" />
-            <circle id="workout-timer-progress" cx="50" cy="50" r="45" fill="none" stroke="var(--primary-color)" stroke-width="6" stroke-dasharray="282.743" stroke-dashoffset="0" style="transition: stroke-dashoffset 1s linear, stroke 0.3s ease; stroke-linecap: round;" />
-          </svg>
-          <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-            <div id="workout-timer-type" style="font-size: 1.2rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px;">휴식</div>
-            <div id="workout-timer-display" style="font-size: 3.5rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1;">00:00</div>
-          </div>
-        </div>
-        
-        <div style="display: flex; justify-content: center; gap: 10px; margin-top: 20px; width: 100%; max-width: 300px;">
-          <button id="btn-workout-timer-add" class="btn btn-secondary" style="flex: 1; padding: 12px; border: 1px solid var(--border-color); background: var(--surface-color);">+ 특수 휴식 연장</button>
-          <button id="btn-workout-timer-stop" class="btn btn-secondary" style="flex: 1; padding: 12px; border: 1px solid var(--border-color); background: var(--surface-color);">휴식 건너뛰기</button>
-        </div>
-
-        <div id="workout-timer-finished" style="display: none; text-align: center; margin-top: 15px; width: 100%; max-width: 300px;">
-          <p style="color: var(--primary-color); font-weight: 600; font-size: 1.1rem; margin-bottom: 12px;">휴식이 완료되었습니다!</p>
-          <div style="display: flex; gap: 10px;">
-            <button id="btn-workout-timer-extend" class="btn btn-secondary" style="flex: 1;">휴식 연장</button>
-            <button id="btn-workout-timer-close" class="btn btn-accent" style="flex: 1;">알람 끄기</button>
-          </div>
-        </div>
+        <button id="btn-finish-workout" class="btn btn-danger" style="width: auto;">운동 종료</button>
       </div>
 
       <div id="active-exercise-container"></div>
+      
+      <div class="card" id="mini-timer-card" style="display: none; background: var(--bg-color); border-color: var(--accent-color);">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div id="mini-timer-label" style="font-size: 0.875rem; color: var(--accent-color); font-weight: 600;">휴식 중...</div>
+            <div id="mini-timer-display" style="font-size: 1.25rem; font-weight: 700;">00:00</div>
+          </div>
+          <button id="btn-mini-add-rest" class="btn btn-secondary" style="width: auto; padding: 6px 12px;">+ 추가 휴식</button>
+        </div>
+      </div>
     </div>
   `;
 
+  let stopwatchInterval = null;
   const setupView = container.querySelector('#workout-setup');
   const activeView = container.querySelector('#workout-active');
   const routineSelect = container.querySelector('#workout-routine-select');
   const btnStart = container.querySelector('#btn-start-workout');
-  const stopwatchDisplay = container.querySelector('#total-stopwatch');
-  const exerciseContainer = container.querySelector('#active-exercise-container');
-  const btnFinishEarly = container.querySelector('#btn-finish-workout-early');
-  
-  let stopwatchInterval;
-  let alarmPlayed = false;
-  let lastWasRunning = false;
 
   const updateRoutineOptions = () => {
     routineSelect.innerHTML = store.state.routines.length === 0
-      ? '<option value="">루틴을 먼저 만드세요</option>'
+      ? '<option value="">등록된 루틴이 없습니다</option>'
       : store.state.routines.map(r => `<option value="${r.id}" ${r.id === store.state.workout.selectedRoutineId ? 'selected' : ''}>${r.name}</option>`).join('');
   };
+  const btnFinish = container.querySelector('#btn-finish-workout');
+  const stopwatchDisplay = container.querySelector('#total-stopwatch');
+  const exerciseContainer = container.querySelector('#active-exercise-container');
+  
+  const miniTimerCard = container.querySelector('#mini-timer-card');
+  const miniTimerDisplay = container.querySelector('#mini-timer-display');
+  const miniTimerLabel = container.querySelector('#mini-timer-label');
+  const btnMiniAddRest = container.querySelector('#btn-mini-add-rest');
 
   const updateStopwatch = () => {
     if (store.state.workout.isRecording) {
@@ -1081,11 +1235,52 @@ function renderWorkoutTab() {
       stopwatchDisplay.textContent = `${h}:${m}:${s}`;
     }
   };
-  
-  btnFinishEarly.addEventListener('click', () => {
-    if (confirm('운동을 조기 종료하시겠습니까? 기록은 저장됩니다.')) {
-      store.finishWorkout();
-      stopAlarm();
+
+  btnStart.addEventListener('click', () => {
+    const routineId = routineSelect.value;
+    const routine = store.state.routines.find(r => r.id === routineId);
+    if (!routine || routine.items.length === 0) {
+      alert('해당 루틴에 등록된 운동이 없습니다. [루틴 관리] 탭에서 먼저 추가해주세요.');
+      return;
+    }
+    store.startWorkout(routineId);
+    stopwatchInterval = setInterval(updateStopwatch, 1000);
+    updateStopwatch();
+  });
+
+  btnFinish.addEventListener('click', () => {
+    if (confirm('운동을 종료하시겠습니까?')) {
+      store.stopWorkout();
+      store.stopTimer();
+      clearInterval(stopwatchInterval);
+    }
+  });
+
+  btnMiniAddRest.addEventListener('click', () => {
+    const workout = store.state.workout;
+    const routine = store.state.routines.find(r => r.id === workout.selectedRoutineId);
+    if (!routine) return;
+    const currentScheduleItem = routine.items[workout.currentExerciseIndex];
+    let addedTime = 60;
+    let nextType = 'special';
+
+    if (currentScheduleItem) {
+      const exercise = store.state.exercises.find(e => e.id === currentScheduleItem.exerciseId);
+      if (exercise) {
+        if (store.state.timer.type === 'basic') {
+          addedTime = Math.max(0, exercise.specialRest - exercise.basicRest);
+          nextType = 'special';
+        } else if (store.state.timer.type === 'special') {
+          addedTime = Math.max(0, exercise.maxRest - exercise.specialRest);
+          nextType = 'max';
+        }
+      }
+    }
+    
+    if (addedTime > 0) {
+      store.addTimerTime(addedTime);
+      store.state.timer.type = nextType; 
+      store.notify();
     }
   });
 
@@ -1097,328 +1292,127 @@ function renderWorkoutTab() {
       setupView.style.display = 'none';
       activeView.style.display = 'block';
 
-      const timerSection = container.querySelector('#workout-timer-section');
-      const timerProgress = container.querySelector('#workout-timer-progress');
-      const timerTypeLabel = container.querySelector('#workout-timer-type');
-      const timerDisplay = container.querySelector('#workout-timer-display');
-      const btnTimerAdd = container.querySelector('#btn-workout-timer-add');
-      const btnTimerStop = container.querySelector('#btn-workout-timer-stop');
-      const timerFinished = container.querySelector('#workout-timer-finished');
-      const btnTimerExtend = container.querySelector('#btn-workout-timer-extend');
-      const btnTimerClose = container.querySelector('#btn-workout-timer-close');
-
-      const circumference = 2 * Math.PI * 45;
-
-      if (timer.isRunning || (lastWasRunning && timer.timeLeft === 0) || (timer.timeLeft > 0 && timer.type !== 'basic')) {
-        timerSection.style.display = 'flex';
-        
-        const m = Math.floor(timer.timeLeft / 60).toString().padStart(2, '0');
-        const s = (timer.timeLeft % 60).toString().padStart(2, '0');
-        timerDisplay.textContent = `${m}:${s}`;
-
-        if (timer.totalTime > 0) {
-          const offset = circumference - (timer.timeLeft / timer.totalTime) * circumference;
-          timerProgress.style.strokeDashoffset = offset;
-        } else {
-          timerProgress.style.strokeDashoffset = 0;
-        }
-
-        if (timer.type === 'basic') {
-          timerProgress.style.stroke = 'var(--primary-color)';
-          timerTypeLabel.textContent = '기본 휴식';
-        } else if (timer.type === 'special') {
-          timerProgress.style.stroke = 'var(--warning-color)';
-          timerTypeLabel.textContent = '특수 휴식';
-        } else if (timer.type === 'max') {
-          timerProgress.style.stroke = 'var(--danger-color)';
-          timerTypeLabel.textContent = '최대 휴식';
-        } else if (timer.type === 'inter') {
-          timerProgress.style.stroke = 'var(--accent-color)';
-          timerTypeLabel.textContent = '종목간 휴식';
-        }
-
-        if (timer.isRunning) {
-          btnTimerAdd.style.display = (timer.type === 'max' || timer.type === 'inter') ? 'none' : 'block';
-          if (timer.type === 'basic') btnTimerAdd.textContent = '+ 특수 휴식 연장';
-          else if (timer.type === 'special') btnTimerAdd.textContent = '+ 최대 휴식 연장';
-          btnTimerStop.style.display = 'block';
-          timerFinished.style.display = 'none';
-          lastWasRunning = true;
-          alarmPlayed = false;
-        } else {
-          btnTimerAdd.style.display = 'none';
-          btnTimerStop.style.display = 'none';
-          
-          if (lastWasRunning && timer.timeLeft === 0) {
-            timerFinished.style.display = 'block';
-            btnTimerExtend.style.display = (timer.type === 'max' || timer.type === 'inter') ? 'none' : 'block';
-            if (timer.type === 'basic') btnTimerExtend.textContent = '특수 휴식 연장';
-            else if (timer.type === 'special') btnTimerExtend.textContent = '최대 휴식 연장';
-            
-            if (!alarmPlayed) {
-              const alarm = document.getElementById('alarm-sound');
-              if (alarm) {
-                alarm.currentTime = 0;
-                alarm.play().catch(e => console.log("Audio play blocked", e));
-              }
-              alarmPlayed = true;
-            }
-          }
-        }
-      } else {
-        timerSection.style.display = 'none';
-        lastWasRunning = false;
-      }
-
       const routine = routines.find(r => r.id === workout.selectedRoutineId);
       if (!routine) return;
       const currentScheduleItem = routine.items[workout.currentExerciseIndex];
 
       if (!currentScheduleItem) {
         exerciseContainer.innerHTML = `
-          <div class="card" style="text-align: center; padding: 40px 20px;">
-            <h2 style="margin-bottom: 10px;">🎉 모든 운동 완료!</h2>
-            <p style="color: var(--text-secondary); margin-bottom: 20px;">오늘의 루틴을 훌륭하게 소화하셨습니다.</p>
-            <button id="btn-finish-workout" class="btn btn-accent" style="width: auto;">운동 종료</button>
+          <div class="card" style="text-align: center; padding: 30px 10px;">
+            <h2 style="color: var(--accent-color); margin-bottom: 10px;">🎉 모든 운동 완료!</h2>
+            <p style="color: var(--text-secondary);">오늘 계획된 루틴을 모두 마쳤습니다.</p>
           </div>
         `;
-        document.getElementById('btn-finish-workout').addEventListener('click', () => {
-          store.finishWorkout();
-          stopAlarm();
-        });
         return;
       }
 
       const exercise = exercises.find(e => e.id === currentScheduleItem.exerciseId);
-      if (exercise) {
-        const targetData = workout.todayTargets[currentScheduleItem.id] || { weight: '', reps: '10', totalSets: exercise.sets };
-        const totalSets = targetData.totalSets || exercise.sets;
-        const isLastSet = workout.currentSetIndex >= totalSets - 1;
+      if (!exercise) return;
 
-        const precedingRecords = workout.records.filter(r => r.exerciseId === exercise.id && r.exerciseIndex === workout.currentExerciseIndex);
-        let setsHtml = '<div style="margin-bottom: 16px;">';
-        
-        for (let i = 0; i < workout.currentSetIndex; i++) {
-          const rec = precedingRecords.find(r => r.setIndex === i);
-          if (rec) {
-            setsHtml += `
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-color); opacity: 0.5;">
-                <span style="font-weight: 600; color: var(--text-secondary); width: 60px;">${i + 1}세트</span>
-                <span style="color: var(--text-secondary); flex: 1; text-align: center;">${rec.weight ? rec.weight + ' kg' : '맨몸'}</span>
-                <span style="color: var(--text-secondary); flex: 1; text-align: center;">${rec.reps} 회</span>
-                <button type="button" class="btn-edit-set" data-set-index="${i}" style="background: none; border: none; color: var(--text-primary); cursor: pointer; padding: 4px;">✏️</button>
-                <span style="color: var(--primary-color); margin-left: 10px; font-weight: bold;">✓</span>
-              </div>
-            `;
-          }
-        }
+      const isLastSet = workout.currentSetIndex >= exercise.sets - 1;
 
-        const showNextSet = !timer.isRunning && !(lastWasRunning && timer.timeLeft === 0);
-
-        if (workout.currentSetIndex < totalSets && showNextSet) {
-          const lastRec = precedingRecords[precedingRecords.length - 1];
-          const defaultWeight = lastRec ? (lastRec.weight || '') : (targetData.weight || '');
-          const defaultReps = lastRec ? lastRec.reps : targetData.reps;
-
-          setsHtml += `
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-color);">
-              <span style="font-weight: 600; color: var(--primary-color); width: 60px;">${workout.currentSetIndex + 1}세트</span>
-              <div style="display: flex; gap: 8px; flex: 1; justify-content: flex-end;">
-                <div style="display: flex; align-items: center; gap: 4px;">
-                  <input type="number" id="record-weight" step="0.5" value="${defaultWeight}" placeholder="무게" style="width: 70px; padding: 8px; text-align: center; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary);">
-                  <span style="font-size: 0.875rem;">kg</span>
-                </div>
-                <div style="display: flex; align-items: center; gap: 4px;">
-                  <input type="number" id="record-reps" required value="${defaultReps}" placeholder="횟수" style="width: 60px; padding: 8px; text-align: center; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-primary);">
-                  <span style="font-size: 0.875rem;">회</span>
-                </div>
-              </div>
-            </div>
-          `;
-        }
-        setsHtml += '</div>';
-
-        exerciseContainer.innerHTML = `
-          <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px;">
-              <h2 style="font-size: 1.25rem;">${exercise.name}</h2>
-              <span style="color: var(--primary-color); font-weight: 600;">${Math.min(workout.currentSetIndex + 1, totalSets)} / ${totalSets} 세트</span>
-            </div>
-            
-            <div style="background: var(--bg-color); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
-              <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 4px;">목표: <strong style="color: var(--text-primary);">${targetData.weight ? targetData.weight + 'kg / ' : ''}${targetData.reps}회</strong></p>
-              <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0;">휴식: 기본 ${Math.floor(exercise.basicRest/60)}분 ${exercise.basicRest%60}초 / 특수 ${Math.floor(exercise.specialRest/60)}분 ${exercise.specialRest%60}초</p>
-            </div>
-
-            <form id="record-set-form">
-              ${setsHtml}
-
-              ${isLastSet && showNextSet ? `
-                <button type="button" id="btn-add-set" class="btn btn-secondary" style="margin-bottom: 10px; width: 100%; border: 1px dashed var(--border-color); background: transparent;">
-                  + 세트 추가
-                </button>
-              ` : ''}
-
-              ${showNextSet ? `
-                <button type="submit" class="btn" style="height: 50px; font-size: 1.1rem; margin-top: 10px;">
-                  ${isLastSet ? '마지막 세트 완료' : '세트 완료 및 휴식 시작'}
-                </button>
-              ` : `
-                <div style="text-align: center; padding: 20px; color: var(--text-secondary);">
-                  휴식 중입니다. 휴식 완료 후 다음 세트 입력이 가능합니다.
-                </div>
-              `}
-            </form>
+      exerciseContainer.innerHTML = `
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px;">
+            <h2 style="font-size: 1.25rem;">${exercise.name}</h2>
+            <span style="color: var(--primary-color); font-weight: 600;">${workout.currentSetIndex + 1} / ${exercise.sets} 세트</span>
           </div>
-        `;
+          
+          <div style="background: var(--bg-color); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 4px;">목표: <strong style="color: var(--text-primary);">${currentScheduleItem.targetWeight ? currentScheduleItem.targetWeight + 'kg / ' : ''}${currentScheduleItem.targetReps}회</strong></p>
+            <p style="font-size: 0.875rem; color: var(--text-secondary);">휴식: 기본 ${Math.floor(exercise.basicRest/60)}분 ${exercise.basicRest%60}초 / 특수 ${Math.floor(exercise.specialRest/60)}분 ${exercise.specialRest%60}초 / 최대 ${Math.floor(exercise.maxRest/60)}분 ${exercise.maxRest%60}초</p>
+          </div>
 
-        if (showNextSet) {
-          container.querySelector('#record-set-form').addEventListener('submit', (e) => {
-            e.preventDefault();
+          <form id="record-set-form">
+            <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+              <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                <label>실행 횟수</label>
+                <input type="number" id="record-reps" required placeholder="${currentScheduleItem.targetReps}">
+              </div>
+              <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                <label>무게 (kg)</label>
+                <input type="number" id="record-weight" step="0.5" value="${currentScheduleItem.targetWeight || ''}" placeholder="선택">
+              </div>
+            </div>
             
-            const reps = parseInt(container.querySelector('#record-reps').value, 10);
-            const weightInput = container.querySelector('#record-weight');
-            const weight = weightInput && weightInput.value ? parseFloat(weightInput.value) : null;
-            
-            store.addRecord(
-              exercise.id,
-              workout.currentExerciseIndex,
-              workout.currentSetIndex,
-              reps,
-              weight
-            );
+            <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+              ${exercise.hasJCup ? `
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                  <label>J-Cup 번호</label>
+                  <input type="number" id="record-jcup" required value="${exercise.jcupValue || ''}" placeholder="입력">
+                </div>
+              ` : ''}
+              ${exercise.hasSafebar ? `
+                <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                  <label>세이프바 번호</label>
+                  <input type="number" id="record-safebar" required value="${exercise.safebarValue || ''}" placeholder="입력">
+                </div>
+              ` : ''}
+            </div>
 
-            store.nextSet(isLastSet);
+            <button type="submit" class="btn" style="height: 50px; font-size: 1.1rem;" ${timer.isRunning ? 'disabled' : ''}>
+              ${timer.isRunning ? '휴식 중...' : (isLastSet ? '마지막 세트 완료' : '세트 완료 및 휴식 시작')}
+            </button>
+          </form>
+        </div>
+      `;
 
-            const nextScheduleItem = routine.items[store.state.workout.currentExerciseIndex];
-            if (nextScheduleItem) {
-              const restTime = isLastSet ? (exercise.interRest ?? 120) : exercise.basicRest;
-              store.startTimer(restTime, isLastSet ? 'inter' : 'basic');
-            }
+      const form = container.querySelector('#record-set-form');
+      if (form) {
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          store.recordSet({
+            exerciseId: exercise.id,
+            setIndex: workout.currentSetIndex,
+            reps: container.querySelector('#record-reps').value,
+            weight: container.querySelector('#record-weight')?.value || null,
+            jcup: container.querySelector('#record-jcup')?.value || null,
+            safebar: container.querySelector('#record-safebar')?.value || null,
           });
-        }
-        
-        if (isLastSet && showNextSet) {
-          const btnAddSet = container.querySelector('#btn-add-set');
-          if (btnAddSet) {
-            btnAddSet.addEventListener('click', () => {
-              targetData.totalSets = totalSets + 1;
-              store.save('workout');
-              store.notify();
-            });
+
+          store.nextSet(isLastSet);
+
+          const newScheduleItem = routine.items[store.state.workout.currentExerciseIndex];
+          if (newScheduleItem) {
+            store.startTimer(exercise.basicRest, 'basic');
           }
-        }
-        
-        container.querySelectorAll('.btn-edit-set').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            const setIdx = parseInt(e.target.dataset.setIndex, 10);
-            const weight = prompt('수정할 무게를 입력하세요 (맨몸일 경우 비워둠)');
-            const reps = prompt('수정할 횟수를 입력하세요', '10');
-            
-            if (reps) {
-              store.state.workout.records = store.state.workout.records.map(r => {
-                if (r.exerciseIndex === workout.currentExerciseIndex && r.setIndex === setIdx) {
-                  return { ...r, reps: parseInt(reps, 10), weight: weight ? parseFloat(weight) : null };
-                }
-                return r;
-              });
-              store.save('workout');
-              store.notify();
-            }
-          });
         });
-
       }
+
+      if (timer.isRunning) {
+        miniTimerCard.style.display = 'block';
+        const m = Math.floor(timer.timeLeft / 60).toString().padStart(2, '0');
+        const s = (timer.timeLeft % 60).toString().padStart(2, '0');
+        miniTimerDisplay.textContent = `${m}:${s}`;
+        
+        btnMiniAddRest.style.display = timer.type === 'max' ? 'none' : 'block';
+        if (timer.type === 'basic') btnMiniAddRest.textContent = '+ 특수 휴식 연장';
+        else if (timer.type === 'special') btnMiniAddRest.textContent = '+ 최대 휴식 연장';
+
+        if (timer.type === 'special') {
+          miniTimerLabel.textContent = '특수 휴식 진행 중...';
+          miniTimerLabel.style.color = 'var(--warning-color)';
+          miniTimerCard.style.borderColor = 'var(--warning-color)';
+        } else if (timer.type === 'max') {
+          miniTimerLabel.textContent = '최대 휴식 진행 중...';
+          miniTimerLabel.style.color = 'var(--danger-color)';
+          miniTimerCard.style.borderColor = 'var(--danger-color)';
+        } else {
+          miniTimerLabel.textContent = '기본 휴식 진행 중...';
+          miniTimerLabel.style.color = 'var(--accent-color)';
+          miniTimerCard.style.borderColor = 'var(--accent-color)';
+        }
+      } else {
+        miniTimerCard.style.display = 'none';
+      }
+
     } else {
       setupView.style.display = 'block';
       activeView.style.display = 'none';
     }
   };
 
-  btnStart.addEventListener('click', () => {
-    const routineId = routineSelect.value;
-    if (!routineId) {
-      alert('[루틴 관리] 탭에서 먼저 추가해주세요.');
-      return;
-    }
-    
-    const routine = store.state.routines.find(r => r.id === routineId);
-    if (!routine) return;
-    
-    routine.items.forEach(item => {
-      const ex = store.state.exercises.find(e => e.id === item.exerciseId);
-      store.state.workout.todayTargets[item.id] = {
-        weight: '',
-        reps: '10',
-        totalSets: ex ? ex.sets : 5
-      };
-    });
-    
-    store.startWorkout(routineId);
-    stopwatchInterval = setInterval(updateStopwatch, 1000);
-    updateStopwatch();
-  });
-
-  const stopAlarm = () => {
-    const alarm = document.getElementById('alarm-sound');
-    if (alarm) { alarm.pause(); alarm.currentTime = 0; }
-  };
-
-  const getNextTimerTypeAndAddedTime = (currentType) => {
-    let nextType = 'special';
-    let addedTime = 60;
-    
-    const workout = store.state.workout;
-    if (workout.isRecording) {
-      const routine = store.state.routines.find(r => r.id === workout.selectedRoutineId);
-      if (routine) {
-        const currentScheduleItem = routine.items[workout.currentExerciseIndex];
-        if (currentScheduleItem) {
-          const exercise = store.state.exercises.find(e => e.id === currentScheduleItem.exerciseId);
-          if (exercise) {
-            if (currentType === 'basic') {
-              addedTime = Math.max(0, exercise.specialRest - exercise.basicRest);
-              nextType = 'special';
-            } else if (currentType === 'special') {
-              addedTime = Math.max(0, exercise.maxRest - exercise.specialRest);
-              nextType = 'max';
-            }
-          }
-        }
-      }
-    }
-    return { addedTime, nextType };
-  };
-
-  container.addEventListener('click', (e) => {
-    if (e.target.id === 'btn-workout-timer-add') {
-      const { addedTime, nextType } = getNextTimerTypeAndAddedTime(store.state.timer.type);
-      if (addedTime > 0) {
-        store.addTimerTime(addedTime);
-        store.state.timer.type = nextType; 
-        store.notify();
-      }
-    } else if (e.target.id === 'btn-workout-timer-stop') {
-      store.stopTimer();
-      stopAlarm();
-    } else if (e.target.id === 'btn-workout-timer-extend') {
-      const { addedTime, nextType } = getNextTimerTypeAndAddedTime(store.state.timer.type);
-      store.startTimer(addedTime, nextType);
-      container.querySelector('#workout-timer-finished').style.display = 'none';
-      stopAlarm();
-    } else if (e.target.id === 'btn-workout-timer-close') {
-      store.stopTimer();
-      container.querySelector('#workout-timer-finished').style.display = 'none';
-      stopAlarm();
-    }
-  });
-
   store.subscribe(renderActiveWorkout);
-  setInterval(() => {
-    if (store.state.timer.isRunning || store.state.timer.timeLeft > 0) {
-      renderActiveWorkout(store.state);
-    }
-  }, 1000);
   setTimeout(() => renderActiveWorkout(store.state), 0);
 
   return container;
@@ -1430,7 +1424,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const navButtons = document.querySelectorAll('.nav-btn');
 
   const tabs = {
-    
+    timer: renderTimerTab(),
     exercises: renderExercisesTab(),
     schedule: renderScheduleTab(),
     workout: renderWorkoutTab()
@@ -1458,7 +1452,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  switchTab('workout');
+  switchTab('timer');
 
   navButtons.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1466,5 +1460,3 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
-
-
