@@ -1,4 +1,4 @@
-const CACHE_NAME = 'workout-tracker-v1';
+const CACHE_NAME = 'workout-tracker-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -10,6 +10,7 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
+  self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS);
@@ -20,6 +21,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('fetch', (e) => {
   e.respondWith(
     caches.match(e.request).then((response) => {
+      // 캐시에 있으면 반환, 없으면 네트워크 요청. 단, 개발/업데이트를 위해 네트워크부터 확인하는 전략(Network First)도 가능하지만 오프라인 우선을 위해 Cache First 유지.
       return response || fetch(e.request);
     })
   );
@@ -35,6 +37,8 @@ self.addEventListener('activate', (e) => {
           }
         })
       );
+    }).then(() => {
+      return self.clients.claim();
     })
   );
 });
