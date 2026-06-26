@@ -43,7 +43,9 @@ class Store {
         selectedRoutineId: routines[0] ? routines[0].id : null,
         currentExerciseIndex: 0,
         currentSetIndex: 0,
-        records: [], 
+        records: [],
+      todayTargets: {},
+        todayTargets: {}, 
       }
     };
 
@@ -281,7 +283,8 @@ class Store {
       selectedRoutineId: routineId,
       currentExerciseIndex: 0,
       currentSetIndex: 0,
-      records: []
+      records: [],
+      todayTargets: {}
     };
     this.save('workout');
     this.notify();
@@ -954,23 +957,11 @@ function renderScheduleTab() {
             </p>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button class="btn btn-secondary btn-edit" style="width: auto; padding: 6px 10px; font-size: 0.8rem;" data-id="${item.id}">편집</button>
             <button class="btn btn-danger btn-delete" style="width: auto; padding: 6px 10px; font-size: 0.8rem;" data-id="${item.id}">삭제</button>
           </div>
         </div>
       `;
-      el.querySelector('.btn-edit').addEventListener('click', () => {
-        editModeItemId = item.id;
-        select.value = item.exerciseId;
-        targetRepsInput.value = item.targetReps;
-        targetWeightInput.value = item.targetWeight || '';
-        
-        btnAdd.textContent = '수정';
-        btnAdd.classList.add('btn-accent');
-        btnCancelEdit.style.display = 'block';
-        
-        container.scrollTo({ top: 0, behavior: 'smooth' });
-      });
+      
 
       el.querySelector('.btn-delete').addEventListener('click', (e) => {
         if (confirm('정말 삭제하시겠습니까?')) {
@@ -1084,13 +1075,15 @@ function renderWorkoutTab() {
   
   btnFinishEarly.addEventListener('click', () => {
     if (confirm('운동을 조기 종료하시겠습니까? 기록은 저장됩니다.')) {
-      store.finishWorkout();
+      store.stopWorkout();
+      store.stopTimer();
       stopAlarm();
     }
   });
 
   const renderActiveWorkout = (state) => {
     const { workout, routines, exercises, timer } = state;
+    if (!workout.todayTargets) workout.todayTargets = {};
     updateRoutineOptions();
     
     if (workout.isRecording) {
@@ -1183,7 +1176,8 @@ function renderWorkoutTab() {
           </div>
         `;
         document.getElementById('btn-finish-workout').addEventListener('click', () => {
-          store.finishWorkout();
+          store.stopWorkout();
+          store.stopTimer();
           stopAlarm();
         });
         return;
@@ -1280,13 +1274,13 @@ function renderWorkoutTab() {
             const weightInput = container.querySelector('#record-weight');
             const weight = weightInput && weightInput.value ? parseFloat(weightInput.value) : null;
             
-            store.addRecord(
-              exercise.id,
-              workout.currentExerciseIndex,
-              workout.currentSetIndex,
-              reps,
-              weight
-            );
+            store.recordSet({
+              exerciseId: exercise.id,
+              exerciseIndex: workout.currentExerciseIndex,
+              setIndex: workout.currentSetIndex,
+              reps: reps,
+              weight: weight
+            });
 
             store.nextSet(isLastSet);
 
@@ -1337,6 +1331,7 @@ function renderWorkoutTab() {
 
   btnStart.addEventListener('click', () => {
     const routineId = routineSelect.value;
+    if (!store.state.workout.todayTargets) store.state.workout.todayTargets = {};
     if (!routineId) {
       alert('[루틴 관리] 탭에서 먼저 추가해주세요.');
       return;
@@ -1344,6 +1339,8 @@ function renderWorkoutTab() {
     
     const routine = store.state.routines.find(r => r.id === routineId);
     if (!routine) return;
+    
+    store.startWorkout(routineId);
     
     routine.items.forEach(item => {
       const ex = store.state.exercises.find(e => e.id === item.exerciseId);
@@ -1353,8 +1350,7 @@ function renderWorkoutTab() {
         totalSets: ex ? ex.sets : 5
       };
     });
-    
-    store.startWorkout(routineId);
+    store.save('workout');
     stopwatchInterval = setInterval(updateStopwatch, 1000);
     updateStopwatch();
   });
@@ -1399,6 +1395,7 @@ function renderWorkoutTab() {
         store.notify();
       }
     } else if (e.target.id === 'btn-workout-timer-stop') {
+      lastWasRunning = false;
       store.stopTimer();
       stopAlarm();
     } else if (e.target.id === 'btn-workout-timer-extend') {
@@ -1407,6 +1404,7 @@ function renderWorkoutTab() {
       container.querySelector('#workout-timer-finished').style.display = 'none';
       stopAlarm();
     } else if (e.target.id === 'btn-workout-timer-close') {
+      lastWasRunning = false;
       store.stopTimer();
       container.querySelector('#workout-timer-finished').style.display = 'none';
       stopAlarm();
@@ -1414,12 +1412,10 @@ function renderWorkoutTab() {
   });
 
   store.subscribe(renderActiveWorkout);
-  setInterval(() => {
-    if (store.state.timer.isRunning || store.state.timer.timeLeft > 0) {
-      renderActiveWorkout(store.state);
-    }
-  }, 1000);
+
   setTimeout(() => renderActiveWorkout(store.state), 0);
+  setInterval(updateStopwatch, 1000);
+  updateStopwatch();
 
   return container;
 }
@@ -1440,6 +1436,7 @@ document.addEventListener('DOMContentLoaded', () => {
     contentArea.appendChild(tabs[key]);
   }
 
+  if (!store.state.timer.isRunning) { store.state.timer.timeLeft = 0; store.save('timer'); }
   const switchTab = (tabId) => {
     navButtons.forEach(btn => {
       if (btn.dataset.tab === tabId) {
@@ -1466,5 +1463,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+
+
+
+
+
+
+
+
+
+
 
 
