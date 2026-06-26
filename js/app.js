@@ -247,6 +247,7 @@ class Store {
 
   stopTimer() {
     this.state.timer.isRunning = false;
+    this.state.timer.timeLeft = 0;
     this.state.timer.endTime = null;
     this.save('timer');
     this.notify();
@@ -911,8 +912,8 @@ function renderScheduleTab() {
   btnAdd.addEventListener('click', () => {
     if (!currentRoutineId) return alert('루틴을 먼저 선택하거나 만들어주세요.');
     const exerciseId = select.value;
-    const targetReps = targetRepsInput.value || '10';
-    const targetWeight = targetWeightInput.value || '';
+    const targetReps = targetRepsInput ? targetRepsInput.value : '10';
+    const targetWeight = targetWeightInput ? targetWeightInput.value : '';
     if (exerciseId) {
       if (editModeItemId) {
         if (confirm('수정하시겠습니까?')) {
@@ -1119,7 +1120,6 @@ function renderWorkoutTab() {
 
       const circumference = 2 * Math.PI * 45;
 
-      if (timer.isRunning || (lastWasRunning && timer.timeLeft === 0) || (timer.timeLeft > 0 && timer.type !== 'basic')) {
         timerSection.style.display = 'flex';
         
         const m = Math.floor(timer.timeLeft / 60).toString().padStart(2, '0');
@@ -1175,11 +1175,6 @@ function renderWorkoutTab() {
             }
           }
         }
-      } else {
-        timerSection.style.display = 'none';
-        lastWasRunning = false;
-      }
-
       const routine = routines.find(r => r.id === workout.selectedRoutineId);
       if (!routine) return;
       const currentScheduleItem = routine.items[workout.currentExerciseIndex];
@@ -1291,6 +1286,8 @@ function renderWorkoutTab() {
             const weightInput = container.querySelector('#record-weight');
             const weight = weightInput && weightInput.value ? parseFloat(weightInput.value) : null;
             
+            const lastRestType = store.state.timer.type;
+
             store.recordSet({
               exerciseId: exercise.id,
               exerciseIndex: workout.currentExerciseIndex,
@@ -1298,6 +1295,14 @@ function renderWorkoutTab() {
               reps: reps,
               weight: weight
             });
+
+            // Update the previous set's restType with the timer type that was just active
+            const records = store.state.workout.records;
+            const prevRecord = records[records.length - 2];
+            if (prevRecord && prevRecord.exerciseIndex === workout.currentExerciseIndex) {
+              prevRecord.restType = lastRestType;
+              store.save('workout');
+            }
 
             store.nextSet(isLastSet);
 
@@ -1483,16 +1488,16 @@ function renderHistoryTab() {
         <div style="overflow-x: auto; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color);">
           <table style="width: max-content; border-collapse: collapse; text-align: center; font-size: 0.85rem;">
             <thead>
-              <tr style="background: var(--bg-color); border-bottom: 2px solid var(--border-color);">
-                <th colspan="2" style="padding: 12px 8px; border-right: 2px solid var(--border-color); position: sticky; left: 0; background: var(--bg-color); z-index: 10;">일자</th>
+              <tr style="background: var(--bg-color); border-bottom: 3px solid var(--border-color);">
+                <th colspan="2" style="padding: 12px 8px; border-right: 3px solid var(--border-color); position: sticky; left: 0; background: var(--bg-color); z-index: 10;">일자</th>
                 ${history.map(h => {
                   let d = h.date.replace(/\.\s/g, '/').replace(/\./g, '');
                   if (d.length <= 5) d = new Date().getFullYear() + '/' + d;
                   return `<th colspan="2" style="padding: 12px 4px; border-right: 1px solid var(--border-color); min-width: 90px;">${d}</th>`;
                 }).join('')}
               </tr>
-              <tr style="background: var(--bg-color); border-bottom: 2px solid var(--border-color);">
-                <th colspan="2" style="padding: 8px; border-right: 2px solid var(--border-color); position: sticky; left: 0; background: var(--bg-color); z-index: 10;">대분류</th>
+              <tr style="background: var(--bg-color); border-bottom: 3px solid var(--border-color);">
+                <th colspan="2" style="padding: 8px; border-right: 3px solid var(--border-color); position: sticky; left: 0; background: var(--bg-color); z-index: 10;">대분류</th>
                 ${history.map(h => `<th colspan="2" style="padding: 8px 4px; border-right: 1px solid var(--border-color); color: var(--primary-color); white-space: pre-wrap; word-break: keep-all; line-height: 1.2;">${h.routineName}</th>`).join('')}
               </tr>
             </thead>
@@ -1514,9 +1519,9 @@ function renderHistoryTab() {
       const rowSpan = 5 + maxSets * 2; 
 
       html += `
-        <tr style="border-top: 2px solid var(--border-color);">
-          <th rowspan="${rowSpan}" style="padding: 8px 0; border-right: 2px solid var(--border-color); position: sticky; left: 0; background: var(--card-bg); z-index: 5; width: 40px; min-width: 40px; max-width: 40px; box-sizing: border-box; text-align: center; vertical-align: middle;"><div style="writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 4px; margin: 0 auto; display: inline-block;">${title}</div></th>
-          <th style="padding: 8px; border-right: 2px solid var(--border-color); border-bottom: 1px solid var(--border-color); position: sticky; left: 40px; background: var(--card-bg); z-index: 5; white-space: nowrap;">운동 종류</th>
+        <tr style="border-top: 3px solid var(--border-color);">
+          <th rowspan="${rowSpan}" style="padding: 8px 0; border-right: 3px solid var(--border-color); position: sticky; left: 0; background: var(--card-bg); z-index: 5; width: 40px; min-width: 40px; max-width: 40px; box-sizing: border-box; text-align: center; vertical-align: middle;"><div style="writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 4px; margin: 0 auto; display: inline-block;">${title}</div></th>
+          <th style="padding: 8px; border-right: 3px solid var(--border-color); border-bottom: 1px solid var(--border-color); position: sticky; left: 40px; background: var(--card-bg); z-index: 5; white-space: nowrap;">운동 종류</th>
           ${history.map(h => {
             const exRec = h.records.find(r => r.exerciseIndex === exIdx);
             const exName = exRec ? (h.exercisesSnapshot?.find(e => e.id === exRec.exerciseId)?.name || 'Unknown') : '-';
@@ -1535,7 +1540,7 @@ function renderHistoryTab() {
       rests.forEach(rest => {
         html += `
           <tr>
-            <th style="padding: 8px; border-right: 2px solid var(--border-color); border-bottom: 1px solid var(--border-color); position: sticky; left: 40px; background: var(--card-bg); z-index: 5; font-weight: normal; white-space: nowrap;">${rest.label}</th>
+            <th style="padding: 8px; border-right: 3px solid var(--border-color); border-bottom: 1px solid var(--border-color); position: sticky; left: 40px; background: var(--card-bg); z-index: 5; font-weight: normal; white-space: nowrap;">${rest.label}</th>
             ${history.map(h => {
               const exRec = h.records.find(r => r.exerciseIndex === exIdx);
               const ex = exRec ? h.exercisesSnapshot?.find(e => e.id === exRec.exerciseId) : null;
@@ -1554,7 +1559,7 @@ function renderHistoryTab() {
         
         if (isTopHalf) {
           const thBorderBottom = (s === maxSets - 1) ? '' : 'border-bottom: 1px solid var(--border-color);';
-          html += `<th rowspan="2" style="padding: 0 8px; border-right: 2px solid var(--border-color); ${thBorderBottom} position: sticky; left: 40px; background: var(--card-bg); z-index: 5; font-weight: normal; white-space: nowrap; vertical-align: middle;">SET ${s + 1}</th>`;
+          html += `<th rowspan="2" style="padding: 0 8px; border-right: 3px solid var(--border-color); ${thBorderBottom} position: sticky; left: 40px; background: var(--card-bg); z-index: 5; font-weight: normal; white-space: nowrap; vertical-align: middle;">SET ${s + 1}</th>`;
         }
         
         history.map(h => {
@@ -1658,6 +1663,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+
+
+
+
+
 
 
 
