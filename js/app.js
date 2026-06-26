@@ -624,7 +624,7 @@ function renderExercisesTab() {
         <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 16px;">
           <div class="form-group" style="flex: 2; margin-bottom: 0;">
             <label>운동 이름</label>
-            <input type="text" id="ex-name" required placeholder="예: 벤치프레스">
+            <input type="text" id="ex-name" required>
           </div>
           <div class="form-group" style="flex: 1; margin-bottom: 0;">
             <label>분류</label>
@@ -633,39 +633,39 @@ function renderExercisesTab() {
           <button type="button" id="btn-manage-categories" class="btn btn-secondary" style="flex: 0 0 auto; width: auto; padding: 12px; height: 46px;">관리</button>
         </div>
         
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px;">
-          <div class="form-group" style="margin-bottom: 0;">
-            <label>기본 휴식</label>
-            <div style="display: flex; gap: 5px;">
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+          <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 0;">
+            <label style="margin: 0; white-space: nowrap; width: 60px;">기본 휴식</label>
+            <div style="display: flex; gap: 5px; flex: 1;">
               <input type="number" id="ex-basic-m" min="0" value="1" style="width: 100%;">
-              <span style="align-self: center;">분</span>
+              <span style="align-self: center; white-space: nowrap;">분</span>
               <input type="number" id="ex-basic-s" min="0" max="59" value="30" style="width: 100%;">
-              <span style="align-self: center;">초</span>
+              <span style="align-self: center; white-space: nowrap;">초</span>
             </div>
           </div>
-          <div class="form-group" style="margin-bottom: 0;">
-            <label>특수 휴식</label>
-            <div style="display: flex; gap: 5px;">
+          <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 0;">
+            <label style="margin: 0; white-space: nowrap; width: 60px;">특수 휴식</label>
+            <div style="display: flex; gap: 5px; flex: 1;">
               <input type="number" id="ex-special-m" min="0" value="3" style="width: 100%;">
-              <span style="align-self: center;">분</span>
+              <span style="align-self: center; white-space: nowrap;">분</span>
               <input type="number" id="ex-special-s" min="0" max="59" value="0" style="width: 100%;">
-              <span style="align-self: center;">초</span>
+              <span style="align-self: center; white-space: nowrap;">초</span>
             </div>
           </div>
-          <div class="form-group" style="margin-bottom: 0;">
-            <label>최대 휴식</label>
-            <div style="display: flex; gap: 5px;">
+          <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 0;">
+            <label style="margin: 0; white-space: nowrap; width: 60px;">최대 휴식</label>
+            <div style="display: flex; gap: 5px; flex: 1;">
               <input type="number" id="ex-max-m" min="0" value="5" style="width: 100%;">
-              <span style="align-self: center;">분</span>
+              <span style="align-self: center; white-space: nowrap;">분</span>
               <input type="number" id="ex-max-s" min="0" max="59" value="0" style="width: 100%;">
-              <span style="align-self: center;">초</span>
+              <span style="align-self: center; white-space: nowrap;">초</span>
             </div>
           </div>
         </div>
 
-        <div class="form-group">
-          <label>세트 수</label>
-          <input type="number" id="ex-sets" required min="1" value="5">
+        <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
+          <label style="margin: 0; white-space: nowrap;">세트 수</label>
+          <input type="number" id="ex-sets" required min="1" value="5" style="width: 80px;">
         </div>
 
         <div class="checkbox-group" style="align-items: center; justify-content: space-between; flex-wrap: wrap;">
@@ -845,8 +845,13 @@ function renderExercisesTab() {
               ${ex.category ? `<span class="category-tag">${ex.category}</span>` : ''}
               ${ex.name}
             </h3>
-            <p style="font-size: 0.875rem; color: var(--text-secondary);">
-              휴식: ${Math.floor(ex.basicRest/60)}분 ${ex.basicRest%60}초 (특수 ${Math.floor(ex.specialRest/60)}분 ${ex.specialRest%60}초 / 최대 ${Math.floor(ex.maxRest/60)}분 ${ex.maxRest%60}초) / ${ex.sets}세트
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 2px;">
+              목표: ${ex.sets}세트
+            </p>
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 2px;">
+              기본 휴식: ${Math.floor(ex.basicRest/60)}분 ${ex.basicRest%60}초<br>
+              특수 휴식: ${Math.floor(ex.specialRest/60)}분 ${ex.specialRest%60}초<br>
+              최대 휴식: ${Math.floor(ex.maxRest/60)}분 ${ex.maxRest%60}초
             </p>
             <p style="font-size: 0.75rem; color: var(--primary-color); margin-top: 4px;">
               ${ex.hasJCup ? `J-Cup: ${ex.jcupValue || '미지정'} ` : ''}${ex.hasSafebar ? `세이프바: ${ex.safebarValue || '미지정'}` : ''}
@@ -1108,7 +1113,9 @@ function renderScheduleTab() {
             <h3 style="font-size: 1rem; margin-bottom: 4px;"><span style="color: var(--primary-color); margin-right: 8px;">${index + 1}</span> ${ex.name}</h3>
             <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 2px;">목표: ${item.targetWeight ? item.targetWeight + 'kg / ' : ''}${item.targetReps}회 / ${ex.sets}세트</p>
             <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 2px;">
-              휴식: ${Math.floor(ex.basicRest/60)}분 ${ex.basicRest%60}초 (특수 ${Math.floor(ex.specialRest/60)}분 ${ex.specialRest%60}초 / 최대 ${Math.floor(ex.maxRest/60)}분 ${ex.maxRest%60}초)
+              기본 휴식: ${Math.floor(ex.basicRest/60)}분 ${ex.basicRest%60}초<br>
+              특수 휴식: ${Math.floor(ex.specialRest/60)}분 ${ex.specialRest%60}초<br>
+              최대 휴식: ${Math.floor(ex.maxRest/60)}분 ${ex.maxRest%60}초
             </p>
             <p style="font-size: 0.75rem; color: var(--primary-color);">
               ${ex.hasJCup ? `J-Cup: ${ex.jcupValue || '미지정'} ` : ''}${ex.hasSafebar ? `세이프바: ${ex.safebarValue || '미지정'}` : ''}
