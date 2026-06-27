@@ -1459,6 +1459,7 @@ function renderHistoryTab() {
   let selectedHistoryItem = null;
   let currentMonth = new Date().getMonth();
   let currentYear = new Date().getFullYear();
+  let isEditingHistory = false;
 
   const formatRest = (seconds) => {
     if (!seconds) return '-';
@@ -1480,9 +1481,18 @@ function renderHistoryTab() {
 
     let html = `
       <div style="padding: 16px; padding-bottom: 80px;">
-        <div style="display: flex; align-items: center; margin-bottom: 16px;">
-          <button id="btn-back-calendar" class="btn btn-secondary" style="width: auto; padding: 8px 16px; margin-right: 16px;">&larr; 달력으로</button>
-          <h2 style="margin: 0; font-size: 1.25rem;">기록 상세</h2>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+          <div style="display: flex; align-items: center;">
+            <button id="btn-back-calendar" class="btn btn-secondary" style="width: auto; padding: 8px 16px; margin-right: 16px;">&larr; 달력으로</button>
+            <h2 style="margin: 0; font-size: 1.25rem;">기록 상세</h2>
+          </div>
+          <div>
+            ${isEditingHistory 
+              ? `<button id="btn-cancel-history" class="btn btn-secondary" style="width: auto; padding: 6px 12px; margin-right: 8px; font-size: 0.85rem;">취소</button>
+                 <button id="btn-save-history" class="btn btn-primary" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">저장</button>`
+              : `<button id="btn-edit-history" class="btn btn-secondary" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">편집</button>`
+            }
+          </div>
         </div>
         <div style="overflow-x: auto; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color);">
           <table style="width: max-content; border-collapse: collapse; text-align: center; font-size: 0.85rem;">
@@ -1497,7 +1507,7 @@ function renderHistoryTab() {
                       dStr = `${dObj.getFullYear()}/${dObj.getMonth()+1}/${dObj.getDate()}`;
                     }
                   } catch(e) {}
-                  return `<th colspan="2" style="padding: 12px 4px; border-right: 1px solid var(--border-color); min-width: 90px;">${dStr}</th>`;
+                  return `<th colspan="2" style="padding: 12px 4px; border-right: 1px solid var(--border-color); min-width: 140px;">${dStr}</th>`;
                 }).join('')}
               </tr>
               <tr style="background: var(--bg-color); border-bottom: 3px solid var(--border-color);">
@@ -1589,10 +1599,19 @@ function renderHistoryTab() {
             const tdBorderBottom = (s === maxSets - 1) ? '' : 'border-bottom: 1px solid var(--border-color);';
             
             if (rec) {
-              const weightStr = rec.weight ? `${rec.weight}kg ` : '';
-              html += `<td rowspan="2" style="padding: 0 8px; border-right: 1px solid var(--border-color); ${tdBorderBottom} vertical-align: middle; min-width: 60px;">${weightStr}${rec.reps}회</td>`;
+              if (isEditingHistory) {
+                const w = rec.weight || 0;
+                const r = rec.reps || 0;
+                html += `<td rowspan="2" style="padding: 0 4px; border-right: 1px solid var(--border-color); ${tdBorderBottom} vertical-align: middle; min-width: 120px;">
+                  <input type="number" class="edit-weight" data-ex="${exIdx}" data-set="${s}" value="${w}" style="width: 45px; padding: 4px; text-align: center; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-color); color: var(--text-primary); font-size: 0.8rem;"> kg
+                  <input type="number" class="edit-reps" data-ex="${exIdx}" data-set="${s}" value="${r}" style="width: 40px; padding: 4px; text-align: center; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-color); color: var(--text-primary); font-size: 0.8rem;"> 회
+                </td>`;
+              } else {
+                const weightStr = rec.weight ? `${rec.weight}kg ` : '';
+                html += `<td rowspan="2" style="padding: 0 8px; border-right: 1px solid var(--border-color); ${tdBorderBottom} vertical-align: middle; min-width: 120px;">${weightStr}${rec.reps}회</td>`;
+              }
             } else {
-              html += `<td rowspan="2" style="padding: 0 8px; border-right: 1px solid var(--border-color); ${tdBorderBottom} color: var(--border-color); vertical-align: middle; min-width: 60px;">-</td>`;
+              html += `<td rowspan="2" style="padding: 0 8px; border-right: 1px solid var(--border-color); ${tdBorderBottom} color: var(--border-color); vertical-align: middle; min-width: 120px;">-</td>`;
             }
           }
         });
@@ -1734,6 +1753,48 @@ function renderHistoryTab() {
     if (btnBack && currentView === 'detail') {
       currentView = 'calendar';
       selectedHistoryItem = null;
+      isEditingHistory = false;
+      renderContent(state);
+    }
+
+    const btnEdit = e.target.closest('#btn-edit-history');
+    if (btnEdit && currentView === 'detail') {
+      isEditingHistory = true;
+      renderContent(state);
+    }
+
+    const btnCancel = e.target.closest('#btn-cancel-history');
+    if (btnCancel && currentView === 'detail') {
+      isEditingHistory = false;
+      renderContent(state);
+    }
+
+    const btnSave = e.target.closest('#btn-save-history');
+    if (btnSave && currentView === 'detail') {
+      // Gather inputs
+      const weights = container.querySelectorAll('.edit-weight');
+      const reps = container.querySelectorAll('.edit-reps');
+      
+      weights.forEach(wInput => {
+        const exIdx = parseInt(wInput.dataset.ex, 10);
+        const sIdx = parseInt(wInput.dataset.set, 10);
+        const rec = selectedHistoryItem.records.find(r => r.exerciseIndex === exIdx && r.setIndex === sIdx);
+        if (rec) {
+          rec.weight = parseFloat(wInput.value) || 0;
+        }
+      });
+      
+      reps.forEach(rInput => {
+        const exIdx = parseInt(rInput.dataset.ex, 10);
+        const sIdx = parseInt(rInput.dataset.set, 10);
+        const rec = selectedHistoryItem.records.find(r => r.exerciseIndex === exIdx && r.setIndex === sIdx);
+        if (rec) {
+          rec.reps = parseInt(rInput.value, 10) || 0;
+        }
+      });
+
+      store.save('history');
+      isEditingHistory = false;
       renderContent(state);
     }
     
@@ -1807,6 +1868,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+
 
 
 
