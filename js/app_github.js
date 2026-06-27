@@ -699,15 +699,15 @@ function renderExercisesTab() {
     <div class="card">
       <form id="exercise-form">
         <div style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 16px;">
-          <div class="form-group" style="flex: 2; margin-bottom: 0; margin-left: 15px;">
-            <label style="display: block; text-align: center;">운동 이름</label>
+          <div class="form-group" style="flex: 2; margin-bottom: 0;">
+            <label>운동 이름</label>
             <input type="text" id="ex-name" required>
           </div>
           <div class="form-group" style="flex: 1; margin-bottom: 0;">
-            <label style="display: block; text-align: center;">분류</label>
+            <label>분류</label>
             <select id="ex-category" style="width: 100%; padding: 12px; border-radius: 8px; background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color);"></select>
           </div>
-          <button type="button" id="btn-manage-categories" class="btn btn-secondary" style="flex: 0 0 auto; width: auto; padding: 12px; height: 46px;">관리</button>
+          <button type="button" id="btn-manage-categories" class="btn btn-secondary" style="flex: 0 0 auto; width: auto; padding: 12px; height: 46px;">⚙️</button>
         </div>
         
         <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
@@ -975,7 +975,7 @@ function renderExercisesTab() {
 
   const updateCategoryOptions = () => {
     const currentVal = categorySelect.value;
-    categorySelect.innerHTML = '<option value="">선택</option>' + 
+    categorySelect.innerHTML = '<option value="">선택 안 함</option>' + 
       store.state.categories.map(c => `<option value="${c}">${c}</option>`).join('');
     if (currentVal && store.state.categories.includes(currentVal)) {
       categorySelect.value = currentVal;
@@ -996,7 +996,7 @@ function renderExercisesTab() {
         <button type="button" class="btn btn-danger" style="width: auto; padding: 4px 8px; font-size: 0.75rem;">삭제</button>
       `;
       el.querySelector('button').addEventListener('click', () => {
-        if (confirm(`'${cat}' 분류를 삭제하시겠습니까?\n(이 분류에 속한 운동은 '분류 선택'이 됩니다)`)) {
+        if (confirm(`'${cat}' 분류를 정말 삭제하시겠습니까?\n(이 분류를 사용하는 운동은 '선택 안 함'으로 변경됩니다)`)) {
           store.deleteCategory(cat);
           renderCategoryModalList();
           updateCategoryOptions();
@@ -1048,9 +1048,9 @@ function renderScheduleTab() {
   container.id = 'tab-schedule'; // Keep ID for index.html compatibility
 
   container.innerHTML = `
-    <div style="display: flex; align-items: center; justify-content: center; position: relative; min-height: 40px; margin-bottom: 16px;">
-      <h1 class="page-title" style="margin: 0; text-align: center;">루틴 관리</h1>
-      <button id="btn-create-routine" class="btn btn-secondary" style="position: absolute; right: 0; width: auto; padding: 8px 12px; height: 36px; font-size: 0.875rem; margin: 0;">+ 새 루틴</button>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h1 class="page-title">루틴 관리</h1>
+      <button id="btn-create-routine" class="btn btn-secondary" style="width: auto; padding: 8px 12px; height: 36px; font-size: 0.875rem;">+ 새 루틴</button>
     </div>
     
     <div class="card" style="margin-bottom: 20px;">
@@ -1436,315 +1436,7 @@ function renderWorkoutTab() {
       if (exercise) {
         const targetData = workout.todayTargets[currentScheduleItem.id] || { weight: '', reps: '10', totalSets: exercise.sets };
         const totalSets = targetData.totalSets || exercise.sets;
-        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-
-// --- Global UI Helpers ---
-window.makeCustomDropdown = (selectEl) => {
-  if (selectEl.dataset.customDropdownInit || selectEl.style.display === 'none') return;
-  selectEl.style.display = 'none';
-  selectEl.dataset.customDropdownInit = "true";
-  
-  const wrapper = document.createElement('div');
-  wrapper.className = 'custom-select-wrapper';
-  wrapper.style.position = 'relative';
-  wrapper.style.display = 'inline-block';
-  wrapper.style.width = selectEl.style.width || '100%';
-  
-  const display = document.createElement('div');
-  display.className = 'custom-select-display';
-  display.style.padding = '8px 12px';
-  display.style.border = '1px solid var(--border-color)';
-  display.style.borderRadius = '8px';
-  display.style.background = 'var(--bg-color)';
-  display.style.color = 'var(--text-primary)';
-  display.style.cursor = 'pointer';
-  display.style.display = 'flex';
-  display.style.justifyContent = 'space-between';
-  display.style.alignItems = 'center';
-  display.innerHTML = `<span>${selectEl.options[selectEl.selectedIndex]?.text || ''}</span><span style="font-size:0.8em; margin-left:8px;">▼</span>`;
-  
-  const optionsContainer = document.createElement('div');
-  optionsContainer.className = 'custom-select-options';
-  optionsContainer.style.position = 'absolute';
-  optionsContainer.style.top = '100%';
-  optionsContainer.style.left = '0';
-  optionsContainer.style.right = '0';
-  optionsContainer.style.background = 'var(--surface-color)';
-  optionsContainer.style.border = '1px solid var(--border-color)';
-  optionsContainer.style.borderRadius = '8px';
-  optionsContainer.style.marginTop = '4px';
-  optionsContainer.style.zIndex = '1000';
-  optionsContainer.style.maxHeight = '200px';
-  optionsContainer.style.overflowY = 'auto';
-  optionsContainer.style.display = 'none';
-  optionsContainer.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-  
-  Array.from(selectEl.options).forEach(opt => {
-    const optDiv = document.createElement('div');
-    optDiv.style.padding = '10px 12px';
-    optDiv.style.cursor = 'pointer';
-    optDiv.style.borderBottom = '1px solid var(--border-color)';
-    optDiv.textContent = opt.text;
-    
-    if (opt.selected) {
-      optDiv.style.background = 'var(--primary-color)';
-      optDiv.style.color = '#fff';
-    }
-    
-    optDiv.addEventListener('click', (e) => {
-      e.stopPropagation();
-      selectEl.value = opt.value;
-      display.querySelector('span').textContent = opt.text;
-      optionsContainer.style.display = 'none';
-      selectEl.dispatchEvent(new Event('change'));
-      
-      Array.from(optionsContainer.children).forEach(c => {
-        c.style.background = 'transparent';
-        c.style.color = 'var(--text-primary)';
-      });
-      optDiv.style.background = 'var(--primary-color)';
-      optDiv.style.color = '#fff';
-    });
-    optionsContainer.appendChild(optDiv);
-  });
-  
-  display.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const isShowing = optionsContainer.style.display === 'block';
-    document.querySelectorAll('.custom-select-options').forEach(el => el.style.display = 'none');
-    optionsContainer.style.display = isShowing ? 'none' : 'block';
-  });
-  
-  document.addEventListener('click', () => {
-    optionsContainer.style.display = 'none';
-  });
-  
-  selectEl.parentNode.insertBefore(wrapper, selectEl);
-  wrapper.appendChild(selectEl);
-  wrapper.appendChild(display);
-  wrapper.appendChild(optionsContainer);
-  
-  selectEl.addEventListener('change', () => {
-    display.querySelector('span').textContent = selectEl.options[selectEl.selectedIndex]?.text || '';
-    Array.from(optionsContainer.children).forEach((c, i) => {
-      if (selectEl.selectedIndex === i) {
-        c.style.background = 'var(--primary-color)';
-        c.style.color = '#fff';
-      } else {
-        c.style.background = 'transparent';
-        c.style.color = 'var(--text-primary)';
-      }
-    });
-  });
-};
-
-window.showActionSheet = (title, options) => {
-  return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100vw';
-    overlay.style.height = '100vh';
-    overlay.style.background = 'rgba(0,0,0,0.5)';
-    overlay.style.zIndex = '9999';
-    overlay.style.display = 'flex';
-    overlay.style.alignItems = 'flex-end';
-    overlay.style.justifyContent = 'center';
-    overlay.style.transition = 'opacity 0.2s';
-    overlay.style.opacity = '0';
-
-    const sheet = document.createElement('div');
-    sheet.style.width = '100%';
-    sheet.style.maxWidth = '500px';
-    sheet.style.background = 'var(--surface-color)';
-    sheet.style.borderTopLeftRadius = '16px';
-    sheet.style.borderTopRightRadius = '16px';
-    sheet.style.padding = '16px';
-    sheet.style.boxSizing = 'border-box';
-    sheet.style.transform = 'translateY(100%)';
-    sheet.style.transition = 'transform 0.3s cubic-bezier(0.1, 0.8, 0.3, 1)';
-    
-    let html = '';
-    if (title) {
-      html += `<div style="text-align: center; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 12px;">${title}</div>`;
-    }
-    
-    options.forEach(opt => {
-      const color = opt.style === 'destructive' ? 'var(--danger-color)' : (opt.style === 'primary' ? 'var(--primary-color)' : 'var(--text-primary)');
-      const fw = opt.style === 'cancel' ? 'bold' : 'normal';
-      html += `<button class="action-sheet-btn" data-val="${opt.value}" style="width: 100%; padding: 16px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 8px; font-size: 1rem; color: ${color}; font-weight: ${fw}; text-align: center; cursor: pointer;">${opt.text}</button>`;
-    });
-    
-    sheet.innerHTML = html;
-    overlay.appendChild(sheet);
-    document.body.appendChild(overlay);
-
-    requestAnimationFrame(() => {
-      overlay.style.opacity = '1';
-      sheet.style.transform = 'translateY(0)';
-    });
-
-    const closeSheet = (val) => {
-      overlay.style.opacity = '0';
-      sheet.style.transform = 'translateY(100%)';
-      setTimeout(() => {
-        document.body.removeChild(overlay);
-        resolve(val);
-      }, 300);
-    };
-
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) closeSheet(null);
-    });
-
-    sheet.querySelectorAll('.action-sheet-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        closeSheet(btn.dataset.val);
-      });
-    });
-  });
-};
-
-window.showCustomPrompt = (title, defaultValue = '') => {
-  return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100vw';
-    overlay.style.height = '100vh';
-    overlay.style.background = 'rgba(0,0,0,0.5)';
-    overlay.style.zIndex = '9999';
-    overlay.style.display = 'flex';
-    overlay.style.alignItems = 'center';
-    overlay.style.justifyContent = 'center';
-    overlay.style.opacity = '0';
-    overlay.style.transition = 'opacity 0.2s';
-
-    const box = document.createElement('div');
-    box.style.background = 'var(--surface-color)';
-    box.style.padding = '24px';
-    box.style.borderRadius = '16px';
-    box.style.width = '90%';
-    box.style.maxWidth = '400px';
-    box.style.boxShadow = '0 10px 25px rgba(0,0,0,0.5)';
-    box.style.transform = 'scale(0.9)';
-    box.style.transition = 'transform 0.2s';
-
-    box.innerHTML = `
-      <h3 style="margin-top: 0; margin-bottom: 16px; font-size: 1.1rem;">${title}</h3>
-      <input type="text" id="prompt-input" value="${defaultValue}" style="width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-color); color: var(--text-primary); margin-bottom: 24px; font-size: 1rem;">
-      <div style="display: flex; justify-content: flex-end; gap: 12px;">
-        <button id="prompt-cancel" class="btn btn-secondary" style="width: auto; padding: 8px 16px;">취소</button>
-        <button id="prompt-ok" class="btn btn-primary" style="width: auto; padding: 8px 16px;">확인</button>
-      </div>
-    `;
-
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-
-    requestAnimationFrame(() => {
-      overlay.style.opacity = '1';
-      box.style.transform = 'scale(1)';
-      box.querySelector('#prompt-input').focus();
-    });
-
-    const closePrompt = (val) => {
-      overlay.style.opacity = '0';
-      box.style.transform = 'scale(0.9)';
-      setTimeout(() => {
-        document.body.removeChild(overlay);
-        resolve(val);
-      }, 200);
-    };
-
-    box.querySelector('#prompt-cancel').addEventListener('click', () => closePrompt(null));
-    box.querySelector('#prompt-ok').addEventListener('click', () => {
-      closePrompt(box.querySelector('#prompt-input').value);
-    });
-    box.querySelector('#prompt-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') closePrompt(e.target.value);
-    });
-  });
-};
-
-window.showEditSetsModal = (title, setsArray) => {
-  return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100vw';
-    overlay.style.height = '100vh';
-    overlay.style.background = 'rgba(0,0,0,0.5)';
-    overlay.style.zIndex = '9999';
-    overlay.style.display = 'flex';
-    overlay.style.alignItems = 'center';
-    overlay.style.justifyContent = 'center';
-    overlay.style.opacity = '0';
-    overlay.style.transition = 'opacity 0.2s';
-
-    const box = document.createElement('div');
-    box.style.background = 'var(--surface-color)';
-    box.style.padding = '24px';
-    box.style.borderRadius = '16px';
-    box.style.width = '90%';
-    box.style.maxWidth = '400px';
-    box.style.maxHeight = '80vh';
-    box.style.overflowY = 'auto';
-    
-    let html = `<h3 style="margin-top: 0; margin-bottom: 16px; font-size: 1.1rem;">${title}</h3>`;
-    html += `<div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px;">`;
-    
-    setsArray.forEach((s, idx) => {
-      html += `
-        <div style="display: flex; gap: 8px; align-items: center; justify-content: space-between; background: var(--bg-color); padding: 8px; border-radius: 8px;">
-          <span style="font-weight: bold; width: 40px;">Set ${idx + 1}</span>
-          <div style="display: flex; gap: 4px; align-items: center;">
-            <input type="number" id="edit-w-${idx}" value="${s.weight || 0}" style="width: 60px; padding: 6px; text-align: center; border: 1px solid var(--border-color); border-radius: 4px; background: var(--card-bg); color: var(--text-primary);"> kg
-            <input type="number" id="edit-r-${idx}" value="${s.reps || 0}" style="width: 50px; padding: 6px; text-align: center; border: 1px solid var(--border-color); border-radius: 4px; background: var(--card-bg); color: var(--text-primary);"> 회
-          </div>
-        </div>
-      `;
-    });
-    
-    html += `</div>`;
-    html += `
-      <div style="display: flex; justify-content: flex-end; gap: 12px;">
-        <button id="edit-cancel" class="btn btn-secondary" style="width: auto; padding: 8px 16px;">취소</button>
-        <button id="edit-ok" class="btn btn-primary" style="width: auto; padding: 8px 16px;">저장</button>
-      </div>
-    `;
-
-    box.innerHTML = html;
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-
-    requestAnimationFrame(() => {
-      overlay.style.opacity = '1';
-    });
-
-    const closeBox = (val) => {
-      overlay.style.opacity = '0';
-      setTimeout(() => {
-        document.body.removeChild(overlay);
-        resolve(val);
-      }, 200);
-    };
-
-    box.querySelector('#edit-cancel').addEventListener('click', () => closeBox(null));
-    box.querySelector('#edit-ok').addEventListener('click', () => {
-      const res = setsArray.map((_, idx) => {
-        return {
-          weight: parseFloat(box.querySelector('#edit-w-' + idx).value) || 0,
-          reps: parseInt(box.querySelector('#edit-r-' + idx).value, 10) || 0
-        };
-      });
-      closeBox(res);
-    });
-  });
-};
+        const isLastSet = workout.currentSetIndex >= totalSets - 1;
 
         const precedingRecords = workout.records.filter(r => r.exerciseId === exercise.id && r.exerciseIndex === workout.currentExerciseIndex);
         let setsHtml = '<div style="margin-bottom: 16px;">';
@@ -2071,11 +1763,11 @@ function renderHistoryTab() {
     let html = `
       <div style="padding: 16px; padding-bottom: 80px;">
         <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 16px; position: relative; min-height: 40px;">
-          <button id="btn-back-calendar" class="btn btn-secondary" style="position: absolute; left: 0; width: auto; padding: 8px 16px;">&larr; 달력</button>
+          <button id="btn-back-calendar" class="btn btn-secondary" style="position: absolute; left: 0; width: auto; padding: 8px 16px;">&larr; 달력으로</button>
           <h2 style="margin: 0; font-size: 1.25rem; text-align: center;">기록 상세</h2>
-          <div style="position: absolute; right: 0; display: flex; gap: 8px;">
+          <div style="position: absolute; right: 0;">
             ${isEditingHistory 
-              ? `<button id="btn-cancel-history" class="btn btn-secondary" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">취소</button>
+              ? `<button id="btn-cancel-history" class="btn btn-secondary" style="width: auto; padding: 6px 12px; margin-right: 8px; font-size: 0.85rem;">취소</button>
                  <button id="btn-save-history" class="btn btn-primary" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">저장</button>`
               : `<button id="btn-edit-history" class="btn btn-secondary" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">편집</button>`
             }
@@ -2091,7 +1783,7 @@ function renderHistoryTab() {
                   try {
                     let dObj = new Date(h.date.replace(/\./g, '/').replace(/\-/g, '/'));
                     if (!isNaN(dObj.getTime())) {
-                      dStr = `${dObj.getFullYear().toString().substring(2)}/${String(dObj.getMonth()+1).padStart(2, '0')}/${String(dObj.getDate()).padStart(2, '0')}`;
+                      dStr = `${dObj.getFullYear()}/${dObj.getMonth()+1}/${dObj.getDate()}`;
                     }
                   } catch(e) {}
                   return `<th colspan="2" style="padding: 12px 4px; border-right: 1px solid var(--border-color); min-width: 140px;">${dStr}</th>`;
@@ -2126,17 +1818,6 @@ function renderHistoryTab() {
           ${history.map(h => {
             const exRec = h.records.find(r => r.exerciseIndex === exIdx);
             const exName = exRec ? (h.exercisesSnapshot?.find(e => e.id === exRec.exerciseId)?.name || 'Unknown') : '-';
-            if (isEditingHistory && exRec) {
-              return `<td colspan="2" style="padding: 8px; border-right: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); font-weight: bold;">
-                <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                  <span>${exName}</span>
-                  <div style="display: flex; gap: 4px;">
-                    <button class="btn btn-secondary btn-del-set" data-ex="${exIdx}" style="padding: 2px 6px; font-size: 0.7rem; width: auto; height: auto;">- 세트</button>
-                    <button class="btn btn-secondary btn-add-set" data-ex="${exIdx}" style="padding: 2px 6px; font-size: 0.7rem; width: auto; height: auto;">+ 세트</button>
-                  </div>
-                </div>
-              </td>`;
-            }
             return `<td colspan="2" style="padding: 8px; border-right: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); font-weight: bold;">${exName}</td>`;
           }).join('')}
         </tr>
@@ -2189,19 +1870,7 @@ function renderHistoryTab() {
             const labelColor = restLabel ? 'var(--primary-color)' : 'transparent';
             const restBorderBottom = (h_idx === totalHalfRows - 2) ? 'border-bottom: none;' : 'border-bottom: 1px dotted var(--border-color);';
             
-            if (isEditingHistory && rec) {
-              const currentRest = (rec.restType === 'special' || rec.restType === 'max') ? rec.restType : 'basic';
-              let displayLabel = '기본';
-              let btnColor = 'var(--text-secondary)';
-              if (currentRest === 'special') { displayLabel = '특수'; btnColor = 'var(--primary-color)'; }
-              else if (currentRest === 'max') { displayLabel = '최대'; btnColor = 'var(--danger-color)'; }
-              
-              html += `<td rowspan="2" style="width: 24px; padding: 0 2px; border-right: 1px dotted var(--border-color); ${restBorderBottom} vertical-align: middle; text-align: center;">
-                <button type="button" class="btn-edit-rest-type" data-ex="${exIdx}" data-set="${s}" data-val="${currentRest}" style="width: 100%; min-height: 28px; padding: 2px 0; font-size: 9px; font-weight: bold; background: transparent; border: 1px solid var(--border-color); border-radius: 4px; color: ${btnColor}; cursor: pointer; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 1px;">${displayLabel}</button>
-              </td>`;
-            } else {
-              html += `<td rowspan="2" style="width: 24px; padding: 0 2px; font-weight: bold; font-size: 10px; color: ${labelColor}; border-right: 1px dotted var(--border-color); ${restBorderBottom} vertical-align: middle; text-align: center;">${restLabel || '-'}</td>`;
-            }
+            html += `<td rowspan="2" style="width: 24px; padding: 0 2px; font-weight: bold; font-size: 10px; color: ${labelColor}; border-right: 1px dotted var(--border-color); ${restBorderBottom} vertical-align: middle; text-align: center;">${restLabel || '-'}</td>`;
           }
           
           if (isTopHalf) {
@@ -2392,7 +2061,9 @@ function renderHistoryTab() {
       renderContent(state);
     }
 
-    const saveCurrentEdits = () => {
+    const btnSave = e.target.closest('#btn-save-history');
+    if (btnSave && currentView === 'detail') {
+      // Gather inputs
       const weights = container.querySelectorAll('.edit-weight');
       const reps = container.querySelectorAll('.edit-reps');
       
@@ -2413,58 +2084,7 @@ function renderHistoryTab() {
           rec.reps = parseInt(rInput.value, 10) || 0;
         }
       });
-    };
 
-    const btnAddSet = e.target.closest('.btn-add-set');
-    if (btnAddSet && currentView === 'detail' && isEditingHistory) {
-      saveCurrentEdits();
-      const exIdx = parseInt(btnAddSet.dataset.ex, 10);
-      const exRecords = selectedHistoryItem.records.filter(r => r.exerciseIndex === exIdx);
-      if (exRecords.length > 0) {
-        const lastRec = exRecords[exRecords.length - 1];
-        const newSetIndex = Math.max(...exRecords.map(r => r.setIndex)) + 1;
-        selectedHistoryItem.records.push({
-          ...lastRec,
-          setIndex: newSetIndex,
-          weight: lastRec.weight || 0,
-          reps: lastRec.reps || 0
-        });
-        renderContent(state);
-      }
-    }
-
-    const btnDelSet = e.target.closest('.btn-del-set');
-    if (btnDelSet && currentView === 'detail' && isEditingHistory) {
-      saveCurrentEdits();
-      const exIdx = parseInt(btnDelSet.dataset.ex, 10);
-      const exRecords = selectedHistoryItem.records.filter(r => r.exerciseIndex === exIdx);
-      if (exRecords.length > 1) { // keep at least 1 set
-        const lastRec = exRecords[exRecords.length - 1];
-        selectedHistoryItem.records = selectedHistoryItem.records.filter(r => r !== lastRec);
-        renderContent(state);
-      } else {
-        alert("최소 1개의 세트는 유지해야 합니다.");
-      }
-    }
-
-    const btnEditRestType = e.target.closest('.btn-edit-rest-type');
-    if (btnEditRestType && currentView === 'detail' && isEditingHistory) {
-      saveCurrentEdits();
-      const exIdx = parseInt(btnEditRestType.dataset.ex, 10);
-      const sIdx = parseInt(btnEditRestType.dataset.set, 10);
-      const rec = selectedHistoryItem.records.find(r => r.exerciseIndex === exIdx && r.setIndex === sIdx);
-      if (rec) {
-        const currentVal = btnEditRestType.dataset.val;
-        if (currentVal === 'basic') rec.restType = 'special';
-        else if (currentVal === 'special') rec.restType = 'max';
-        else rec.restType = 'basic';
-        renderContent(state);
-      }
-    }
-
-    const btnSave = e.target.closest('#btn-save-history');
-    if (btnSave && currentView === 'detail') {
-      saveCurrentEdits();
       store.save('history');
       isEditingHistory = false;
       renderContent(state);

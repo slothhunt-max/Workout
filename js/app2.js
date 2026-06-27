@@ -2189,19 +2189,7 @@ function renderHistoryTab() {
             const labelColor = restLabel ? 'var(--primary-color)' : 'transparent';
             const restBorderBottom = (h_idx === totalHalfRows - 2) ? 'border-bottom: none;' : 'border-bottom: 1px dotted var(--border-color);';
             
-            if (isEditingHistory && rec) {
-              const currentRest = (rec.restType === 'special' || rec.restType === 'max') ? rec.restType : 'basic';
-              let displayLabel = '기본';
-              let btnColor = 'var(--text-secondary)';
-              if (currentRest === 'special') { displayLabel = '특수'; btnColor = 'var(--primary-color)'; }
-              else if (currentRest === 'max') { displayLabel = '최대'; btnColor = 'var(--danger-color)'; }
-              
-              html += `<td rowspan="2" style="width: 24px; padding: 0 2px; border-right: 1px dotted var(--border-color); ${restBorderBottom} vertical-align: middle; text-align: center;">
-                <button type="button" class="btn-edit-rest-type" data-ex="${exIdx}" data-set="${s}" data-val="${currentRest}" style="width: 100%; min-height: 28px; padding: 2px 0; font-size: 9px; font-weight: bold; background: transparent; border: 1px solid var(--border-color); border-radius: 4px; color: ${btnColor}; cursor: pointer; writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 1px;">${displayLabel}</button>
-              </td>`;
-            } else {
-              html += `<td rowspan="2" style="width: 24px; padding: 0 2px; font-weight: bold; font-size: 10px; color: ${labelColor}; border-right: 1px dotted var(--border-color); ${restBorderBottom} vertical-align: middle; text-align: center;">${restLabel || '-'}</td>`;
-            }
+            html += `<td rowspan="2" style="width: 24px; padding: 0 2px; font-weight: bold; font-size: 10px; color: ${labelColor}; border-right: 1px dotted var(--border-color); ${restBorderBottom} vertical-align: middle; text-align: center;">${restLabel || '-'}</td>`;
           }
           
           if (isTopHalf) {
@@ -2444,21 +2432,6 @@ function renderHistoryTab() {
         renderContent(state);
       } else {
         alert("최소 1개의 세트는 유지해야 합니다.");
-      }
-    }
-
-    const btnEditRestType = e.target.closest('.btn-edit-rest-type');
-    if (btnEditRestType && currentView === 'detail' && isEditingHistory) {
-      saveCurrentEdits();
-      const exIdx = parseInt(btnEditRestType.dataset.ex, 10);
-      const sIdx = parseInt(btnEditRestType.dataset.set, 10);
-      const rec = selectedHistoryItem.records.find(r => r.exerciseIndex === exIdx && r.setIndex === sIdx);
-      if (rec) {
-        const currentVal = btnEditRestType.dataset.val;
-        if (currentVal === 'basic') rec.restType = 'special';
-        else if (currentVal === 'special') rec.restType = 'max';
-        else rec.restType = 'basic';
-        renderContent(state);
       }
     }
 
