@@ -1,3 +1,240 @@
+window.showCustomPrompt = (message, defaultValue = '', type = 'text') => {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.backgroundColor = 'rgba(0,0,0,0.6)';
+    overlay.style.zIndex = '99999';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.2s ease';
+
+    const modal = document.createElement('div');
+    modal.style.backgroundColor = 'var(--surface-color)';
+    modal.style.padding = '24px';
+    modal.style.borderRadius = '16px';
+    modal.style.width = '85%';
+    modal.style.maxWidth = '320px';
+    modal.style.boxShadow = '0 10px 25px rgba(0,0,0,0.5)';
+    modal.style.transform = 'translateY(20px)';
+    modal.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    modal.style.display = 'flex';
+    modal.style.flexDirection = 'column';
+    modal.style.gap = '16px';
+
+    const title = document.createElement('h3');
+    title.innerText = message;
+    title.style.margin = '0';
+    title.style.color = 'var(--text-primary)';
+    title.style.fontSize = '1.1rem';
+    title.style.textAlign = 'center';
+
+    const input = document.createElement('input');
+    if (type === 'number') {
+      input.type = 'number';
+      input.step = 'any';
+    } else {
+      input.type = 'text';
+    }
+    input.value = defaultValue;
+    input.style.width = '100%';
+    input.style.padding = '12px';
+    input.style.borderRadius = '8px';
+    input.style.border = '1px solid var(--border-color)';
+    input.style.backgroundColor = 'var(--bg-color)';
+    input.style.color = 'var(--text-primary)';
+    input.style.fontSize = '1rem';
+    input.style.textAlign = 'center';
+    input.style.outline = 'none';
+
+    const btnGroup = document.createElement('div');
+    btnGroup.style.display = 'flex';
+    btnGroup.style.gap = '10px';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.innerText = '취소';
+    cancelBtn.className = 'btn btn-secondary';
+    cancelBtn.style.flex = '1';
+    cancelBtn.style.padding = '10px';
+    cancelBtn.style.margin = '0';
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.innerText = '확인';
+    confirmBtn.className = 'btn btn-primary';
+    confirmBtn.style.flex = '1';
+    confirmBtn.style.padding = '10px';
+    confirmBtn.style.margin = '0';
+
+    btnGroup.appendChild(cancelBtn);
+    btnGroup.appendChild(confirmBtn);
+
+    modal.appendChild(title);
+    modal.appendChild(input);
+    modal.appendChild(btnGroup);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    requestAnimationFrame(() => {
+      overlay.style.opacity = '1';
+      modal.style.transform = 'translateY(0)';
+    });
+
+    input.focus();
+    if(type === 'text') {
+      const val = input.value;
+      input.value = '';
+      input.value = val;
+    }
+
+    const close = (val) => {
+      overlay.style.opacity = '0';
+      modal.style.transform = 'translateY(20px)';
+      setTimeout(() => {
+        if (document.body.contains(overlay)) {
+          document.body.removeChild(overlay);
+        }
+        resolve(val);
+      }, 200);
+    };
+
+    cancelBtn.addEventListener('click', () => close(null));
+    confirmBtn.addEventListener('click', () => close(input.value));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') close(input.value);
+      if (e.key === 'Escape') close(null);
+    });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close(null);
+    });
+  });
+};
+
+
+window.makeCustomDropdown = (selectEl) => {
+  if (selectEl.dataset.customized) return;
+  selectEl.dataset.customized = "true";
+  selectEl.style.display = 'none';
+
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'relative';
+  wrapper.style.width = selectEl.style.width || '100%';
+  wrapper.style.flex = selectEl.style.flex || 'initial';
+  wrapper.style.marginBottom = selectEl.style.marginBottom || '0';
+
+  const header = document.createElement('div');
+  header.style.padding = '12px 36px 12px 12px';
+  header.style.backgroundColor = 'var(--bg-color)';
+  header.style.border = '1px solid var(--border-color)';
+  header.style.borderRadius = '8px';
+  header.style.color = 'var(--text-primary)';
+  header.style.cursor = 'pointer';
+  header.style.textAlign = 'center';
+  header.style.display = 'flex';
+  header.style.justifyContent = 'center';
+  header.style.alignItems = 'center';
+  header.style.minHeight = '48px';
+  header.style.backgroundImage = 'url(\'data:image/svg+xml;utf8,<svg fill="%2394a3b8" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>\')';
+  header.style.backgroundRepeat = 'no-repeat';
+  header.style.backgroundPosition = 'right 12px center';
+  header.style.userSelect = 'none';
+  
+  const textSpan = document.createElement('span');
+  textSpan.style.pointerEvents = 'none';
+  header.appendChild(textSpan);
+
+  const list = document.createElement('div');
+  list.style.position = 'absolute';
+  list.style.top = '100%';
+  list.style.left = '0';
+  list.style.right = '0';
+  list.style.marginTop = '4px';
+  list.style.backgroundColor = 'var(--surface-color)';
+  list.style.border = '1px solid var(--border-color)';
+  list.style.borderRadius = '8px';
+  list.style.maxHeight = '200px';
+  list.style.overflowY = 'auto';
+  list.style.zIndex = '999';
+  list.style.display = 'none';
+  list.style.boxShadow = '0 10px 25px rgba(0,0,0,0.5)';
+
+  wrapper.appendChild(header);
+  wrapper.appendChild(list);
+  selectEl.parentNode.insertBefore(wrapper, selectEl.nextSibling);
+
+  let isOpen = false;
+  const toggle = (open) => {
+    isOpen = open;
+    list.style.display = isOpen ? 'block' : 'none';
+  };
+
+  header.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggle(!isOpen);
+  });
+
+  document.addEventListener('click', () => {
+    if (isOpen) toggle(false);
+  });
+
+  const renderOptions = () => {
+    list.innerHTML = '';
+    const options = Array.from(selectEl.options);
+    if(options.length === 0) {
+      textSpan.innerText = '항목 없음';
+      return;
+    }
+    
+    const selected = options[selectEl.selectedIndex] || options[0];
+    if (selected) textSpan.innerText = selected.innerText;
+
+    options.forEach((opt, idx) => {
+      const item = document.createElement('div');
+      item.style.padding = '12px';
+      item.style.textAlign = 'center';
+      item.style.cursor = 'pointer';
+      item.style.borderBottom = idx < options.length - 1 ? '1px solid var(--border-color)' : 'none';
+      item.innerText = opt.innerText;
+      
+      if(opt.selected) {
+        item.style.backgroundColor = 'var(--primary-color)';
+        item.style.color = '#fff';
+        item.style.fontWeight = 'bold';
+      }
+
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectEl.selectedIndex = idx;
+        textSpan.innerText = opt.innerText;
+        toggle(false);
+        selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        renderOptions();
+      });
+      list.appendChild(item);
+    });
+  };
+
+  const observer = new MutationObserver(() => renderOptions());
+  observer.observe(selectEl, { childList: true, subtree: true, attributes: true, attributeFilter: ['selected'] });
+
+  if (!selectEl.dataset.hooked) {
+    selectEl.dataset.hooked = "true";
+    const desc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
+    Object.defineProperty(selectEl, 'value', {
+      get: desc.get,
+      set: function(v) {
+        desc.set.call(this, v);
+        renderOptions();
+      }
+    });
+  }
+
+  renderOptions();
+};
 // --- Store Logic ---
 class Store {
   constructor() {
@@ -478,6 +715,7 @@ function renderExercisesTab() {
             <label style="margin: 0; white-space: nowrap; width: 75px; text-align: right;">세트 수</label>
             <div style="display: flex; gap: 5px; flex: 1;">
               <input type="number" id="ex-sets" required min="1" value="5" style="width: 100%;">
+              <span style="visibility: hidden; white-space: nowrap; align-self: center;">초</span>
             </div>
           </div>
           <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 0;">
@@ -878,8 +1116,8 @@ function renderScheduleTab() {
     renderList(store.state);
   });
 
-  btnCreateRoutine.addEventListener('click', () => {
-    const name = prompt('새 루틴 이름을 입력하세요:');
+  btnCreateRoutine.addEventListener('click', async () => {
+    const name = await window.showCustomPrompt('새 루틴 이름을 입력하세요:');
     if (name && name.trim()) {
       store.addRoutine(name.trim());
       currentRoutineId = store.state.routines[store.state.routines.length - 1].id;
@@ -888,10 +1126,10 @@ function renderScheduleTab() {
     }
   });
 
-  btnRenameRoutine.addEventListener('click', () => {
+  btnRenameRoutine.addEventListener('click', async () => {
     if (!currentRoutineId) return;
     const routine = store.state.routines.find(r => r.id === currentRoutineId);
-    const newName = prompt('새로운 이름을 입력하세요:', routine.name);
+    const newName = await window.showCustomPrompt('새로운 이름을 입력하세요:', routine.name);
     if (newName && newName.trim()) {
       store.updateRoutineName(currentRoutineId, newName.trim());
       updateRoutineSelect();
@@ -1325,10 +1563,10 @@ function renderWorkoutTab() {
         }
         
         container.querySelectorAll('.btn-edit-set').forEach(btn => {
-          btn.addEventListener('click', (e) => {
+          btn.addEventListener('click', async (e) => {
             const setIdx = parseInt(e.target.dataset.setIndex, 10);
-            const weight = prompt('수정할 무게를 입력하세요 (맨몸일 경우 비워둠)');
-            const reps = prompt('수정할 횟수를 입력하세요', '10');
+            const weight = await window.showCustomPrompt('세트 중량 입력하세요 (빈칸 시 맨몸)', '', 'number');
+            const reps = await window.showCustomPrompt('세트 횟수 입력하세요', '10', 'number');
             
             if (reps) {
               store.state.workout.records = store.state.workout.records.map(r => {
@@ -1880,6 +2118,20 @@ function renderHistoryTab() {
 
 // --- Main App Logic ---
 document.addEventListener('DOMContentLoaded', () => {
+  const autoDropdownObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === 1) {
+          if (node.tagName === 'SELECT') window.makeCustomDropdown(node);
+          node.querySelectorAll('select').forEach(window.makeCustomDropdown);
+        }
+      });
+    });
+  });
+  autoDropdownObserver.observe(document.body, { childList: true, subtree: true });
+
+  // Initial pass for any already in DOM
+  document.querySelectorAll('select').forEach(window.makeCustomDropdown);
   const contentArea = document.getElementById('tab-content');
   const navButtons = document.querySelectorAll('.nav-btn');
 
@@ -1923,6 +2175,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+
+
+
 
 
 
