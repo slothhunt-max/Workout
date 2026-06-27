@@ -1,4 +1,4 @@
-﻿// --- Store Logic ---
+// --- Store Logic ---
 class Store {
   constructor() {
     const storedRoutines = JSON.parse(localStorage.getItem('routines'));
@@ -470,7 +470,7 @@ function renderExercisesTab() {
             <label>분류</label>
             <select id="ex-category" style="width: 100%; padding: 12px; border-radius: 8px; background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color);"></select>
           </div>
-          <button type="button" id="btn-manage-categories" class="btn btn-secondary" style="flex: 0 0 auto; width: auto; padding: 12px; height: 46px;">관리</button>
+          <button type="button" id="btn-manage-categories" class="btn btn-secondary" style="flex: 0 0 auto; width: auto; padding: 12px; height: 46px;">⚙️</button>
         </div>
         
         <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
@@ -501,16 +501,9 @@ function renderExercisesTab() {
               <span style="align-self: center; white-space: nowrap;">초</span>
             </div>
           </div>
-        </div>
-
-        <div class="form-group" style="display: flex; align-items: center; gap: 20px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <label style="margin: 0; white-space: nowrap;">세트 수</label>
-            <input type="number" id="ex-sets" required min="1" value="5" style="width: 80px;">
-          </div>
-          <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
-            <label style="margin: 0; white-space: nowrap;">종목간 휴식</label>
-            <div style="display: flex; gap: 5px;">
+          <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 0;">
+            <label style="margin: 0; white-space: nowrap; width: 60px;">종목 휴식</label>
+            <div style="display: flex; gap: 5px; flex: 1;">
               <input type="number" id="ex-inter-m" min="0" value="2" style="width: 100%;">
               <span style="align-self: center; white-space: nowrap;">분</span>
               <input type="number" id="ex-inter-s" min="0" max="59" value="0" style="width: 100%;">
@@ -519,10 +512,17 @@ function renderExercisesTab() {
           </div>
         </div>
 
+        <div class="form-group" style="display: flex; align-items: center; gap: 20px; margin-bottom: 16px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <label style="margin: 0; white-space: nowrap;">세트 수</label>
+            <input type="number" id="ex-sets" required min="1" value="5" style="width: 80px;">
+          </div>
+        </div>
+
         <div class="checkbox-group" style="align-items: center; justify-content: space-between; flex-wrap: wrap;">
           <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 150px;">
             <input type="checkbox" id="ex-has-jcup">
-            <label for="ex-has-jcup" style="margin: 0;">J-Cup 번호 저장</label>
+            <label for="ex-has-jcup" style="margin: 0;">J-Cup 번호 입력</label>
           </div>
           <input type="number" id="ex-jcup-val" placeholder="입력" disabled style="flex: 1; min-width: 100px; padding: 8px; border-radius: 8px; background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color); opacity: 0.5;">
         </div>
@@ -530,7 +530,7 @@ function renderExercisesTab() {
         <div class="checkbox-group" style="align-items: center; justify-content: space-between; flex-wrap: wrap;">
           <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 150px;">
             <input type="checkbox" id="ex-has-safebar">
-            <label for="ex-has-safebar" style="margin: 0;">세이프바 번호 저장</label>
+            <label for="ex-has-safebar" style="margin: 0;">안전바 번호 입력</label>
           </div>
           <input type="number" id="ex-safebar-val" placeholder="입력" disabled style="flex: 1; min-width: 100px; padding: 8px; border-radius: 8px; background: var(--bg-color); color: var(--text-primary); border: 1px solid var(--border-color); opacity: 0.5;">
         </div>
@@ -1466,8 +1466,52 @@ function renderHistoryTab() {
     return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
   };
 
+  const getRoutineDisplayName = (h) => {
+    let rName = h.routineName;
+    if (!rName || rName === 'Imported' || rName === '') {
+      if (h.importedRecords && h.importedRecords.length > 0) {
+        rName = h.importedRecords.map(r => r.name).join(', ');
+      } else if (h.records && h.records.length > 0) {
+        rName = Array.from(new Set(h.records.map(r => {
+          const ex = h.exercisesSnapshot?.find(e => e.id === r.exerciseId);
+          return ex ? ex.name : '';
+        }).filter(Boolean))).join(', ');
+      } else {
+        rName = '기록 없음';
+      }
+    }
+    return rName;
+  };
+
   const renderDetailTable = (historyArray) => {
-    const history = historyArray;
+    const history = historyArray.map(h => {
+      let mappedRecords = [...(h.records || [])];
+      let exSnapshot = [...(h.exercisesSnapshot || [])];
+      
+      if (h.importedRecords && h.importedRecords.length > 0) {
+        let maxIdx = -1;
+        mappedRecords.forEach(r => { if (r.exerciseIndex > maxIdx) maxIdx = r.exerciseIndex; });
+        
+        h.importedRecords.forEach((ir, irIdx) => {
+          maxIdx++;
+          const tempExId = 'imported_ex_' + maxIdx;
+          exSnapshot.push({ id: tempExId, name: ir.name, basicRest: 0, specialRest: 0, maxRest: 0, interRest: 0 });
+          
+          ir.sets.forEach((set, sIdx) => {
+             mappedRecords.push({
+               exerciseIndex: maxIdx,
+               exerciseId: tempExId,
+               setIndex: set.setIndex !== undefined ? set.setIndex : sIdx,
+               weight: set.weight,
+               reps: set.reps,
+               jcup: '', safebar: ''
+             });
+          });
+        });
+      }
+      return { ...h, records: mappedRecords, exercisesSnapshot: exSnapshot };
+    });
+
     if (history.length === 0) return '';
 
     let maxExercises = 0;
@@ -1481,12 +1525,10 @@ function renderHistoryTab() {
 
     let html = `
       <div style="padding: 16px; padding-bottom: 80px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-          <div style="display: flex; align-items: center;">
-            <button id="btn-back-calendar" class="btn btn-secondary" style="width: auto; padding: 8px 16px; margin-right: 16px;">&larr; 달력으로</button>
-            <h2 style="margin: 0; font-size: 1.25rem;">기록 상세</h2>
-          </div>
-          <div>
+        <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 16px; position: relative; min-height: 40px;">
+          <button id="btn-back-calendar" class="btn btn-secondary" style="position: absolute; left: 0; width: auto; padding: 8px 16px;">&larr; 달력으로</button>
+          <h2 style="margin: 0; font-size: 1.25rem; text-align: center;">기록 상세</h2>
+          <div style="position: absolute; right: 0;">
             ${isEditingHistory 
               ? `<button id="btn-cancel-history" class="btn btn-secondary" style="width: auto; padding: 6px 12px; margin-right: 8px; font-size: 0.85rem;">취소</button>
                  <button id="btn-save-history" class="btn btn-primary" style="width: auto; padding: 6px 12px; font-size: 0.85rem;">저장</button>`
@@ -1511,8 +1553,8 @@ function renderHistoryTab() {
                 }).join('')}
               </tr>
               <tr style="background: var(--bg-color); border-bottom: 3px solid var(--border-color);">
-                <th colspan="2" style="padding: 8px; border-right: 3px solid var(--border-color); position: sticky; left: 0; background: var(--bg-color); z-index: 10;">대분류</th>
-                ${history.map(h => `<th colspan="2" style="padding: 8px 4px; border-right: 1px solid var(--border-color); color: var(--primary-color); white-space: pre-wrap; word-break: keep-all; line-height: 1.2;">${h.routineName}</th>`).join('')}
+                <th colspan="2" style="padding: 8px; border-right: 3px solid var(--border-color); position: sticky; left: 0; background: var(--bg-color); z-index: 10;">루틴</th>
+                ${history.map(h => `<th colspan="2" style="padding: 8px 4px; border-right: 1px solid var(--border-color); color: var(--primary-color); white-space: pre-wrap; word-break: keep-all; line-height: 1.2;">${getRoutineDisplayName(h)}</th>`).join('')}
               </tr>
             </thead>
             <tbody>
@@ -1698,7 +1740,20 @@ function renderHistoryTab() {
         
         let routinesHtml = '';
         dayHistoryItems.forEach(item => {
-           routinesHtml += `<span style="font-size: 0.7rem; color: var(--primary-color); word-break: keep-all; line-height: 1.1; margin-top: 2px;">${item.routineName}</span>`;
+           let rName = item.routineName;
+           if (!rName || rName === 'Imported' || rName === '') {
+             if (item.importedRecords && item.importedRecords.length > 0) {
+               rName = item.importedRecords.map(r => r.name).join(', ');
+             } else if (item.records && item.records.length > 0) {
+               rName = Array.from(new Set(item.records.map(r => {
+                 const ex = item.exercisesSnapshot?.find(e => e.id === r.exerciseId);
+                 return ex ? ex.name : '';
+               }).filter(Boolean))).join(', ');
+             } else {
+               rName = '기록 없음';
+             }
+           }
+           routinesHtml += `<span style="font-size: 0.7rem; color: var(--primary-color); word-break: keep-all; line-height: 1.1; margin-top: 2px;">${rName}</span>`;
         });
 
         content += `<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1;">${routinesHtml}</div>`;
@@ -1833,7 +1888,8 @@ document.addEventListener('DOMContentLoaded', () => {
     exercises: renderExercisesTab(),
     schedule: renderScheduleTab(),
     workout: renderWorkoutTab(),
-    history: renderHistoryTab()
+    history: renderHistoryTab(),
+    analytics: renderAnalyticsTab()
   };
 
   for (const key in tabs) {
@@ -1868,6 +1924,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+
+
+
+
+
+
+
 
 
 
