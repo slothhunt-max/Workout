@@ -1,4 +1,4 @@
-﻿function renderAnalyticsTab() {
+function renderAnalyticsTab() {
   const container = document.createElement('div');
   container.className = 'tab-pane';
   container.id = 'tab-analytics';
@@ -217,11 +217,11 @@
       });
 
       let listHtml = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-          <h1 class="page-title" style="margin:0;">기록 관리</h1>
-          <div>
+        <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 16px; position: relative; min-height: 40px;">
+          <h1 class="page-title" style="margin:0; text-align: center;">기록 관리</h1>
+          <div style="position: absolute; right: 0; display: flex; gap: 8px; align-items: center;">
             <button id="btn-export-csv" class="btn btn-secondary" style="width: auto; padding: 6px 12px; font-size: 0.8rem;">내보내기</button>
-            <label class="btn btn-primary" style="width: auto; padding: 6px 12px; font-size: 0.8rem; cursor: pointer;">
+            <label class="btn btn-primary" style="margin-bottom: 0; width: auto; padding: 6px 12px; font-size: 0.8rem; cursor: pointer;">
               불러오기
               <input type="file" id="input-import-csv" accept=".csv" style="display: none;">
             </label>

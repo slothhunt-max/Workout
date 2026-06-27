@@ -475,7 +475,13 @@ function renderExercisesTab() {
         
         <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
           <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 0;">
-            <label style="margin: 0; white-space: nowrap; width: 60px;">기본 휴식</label>
+            <label style="margin: 0; white-space: nowrap; width: 75px; text-align: right;">세트 수</label>
+            <div style="display: flex; gap: 5px; flex: 1;">
+              <input type="number" id="ex-sets" required min="1" value="5" style="width: 100%;">
+            </div>
+          </div>
+          <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 0;">
+            <label style="margin: 0; white-space: nowrap; width: 75px; text-align: right;">기본 휴식</label>
             <div style="display: flex; gap: 5px; flex: 1;">
               <input type="number" id="ex-basic-m" min="0" value="1" style="width: 100%;">
               <span style="align-self: center; white-space: nowrap;">분</span>
@@ -484,7 +490,7 @@ function renderExercisesTab() {
             </div>
           </div>
           <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 0;">
-            <label style="margin: 0; white-space: nowrap; width: 60px;">특수 휴식</label>
+            <label style="margin: 0; white-space: nowrap; width: 75px; text-align: right;">특수 휴식</label>
             <div style="display: flex; gap: 5px; flex: 1;">
               <input type="number" id="ex-special-m" min="0" value="3" style="width: 100%;">
               <span style="align-self: center; white-space: nowrap;">분</span>
@@ -493,7 +499,7 @@ function renderExercisesTab() {
             </div>
           </div>
           <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 0;">
-            <label style="margin: 0; white-space: nowrap; width: 60px;">최대 휴식</label>
+            <label style="margin: 0; white-space: nowrap; width: 75px; text-align: right;">최대 휴식</label>
             <div style="display: flex; gap: 5px; flex: 1;">
               <input type="number" id="ex-max-m" min="0" value="5" style="width: 100%;">
               <span style="align-self: center; white-space: nowrap;">분</span>
@@ -502,20 +508,13 @@ function renderExercisesTab() {
             </div>
           </div>
           <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin-bottom: 0;">
-            <label style="margin: 0; white-space: nowrap; width: 60px;">종목 휴식</label>
+            <label style="margin: 0; white-space: nowrap; width: 75px; text-align: right;">종목 휴식</label>
             <div style="display: flex; gap: 5px; flex: 1;">
               <input type="number" id="ex-inter-m" min="0" value="2" style="width: 100%;">
               <span style="align-self: center; white-space: nowrap;">분</span>
               <input type="number" id="ex-inter-s" min="0" max="59" value="0" style="width: 100%;">
               <span style="align-self: center; white-space: nowrap;">초</span>
             </div>
-          </div>
-        </div>
-
-        <div class="form-group" style="display: flex; align-items: center; gap: 20px; margin-bottom: 16px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <label style="margin: 0; white-space: nowrap;">세트 수</label>
-            <input type="number" id="ex-sets" required min="1" value="5" style="width: 80px;">
           </div>
         </div>
 
