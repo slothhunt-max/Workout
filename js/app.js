@@ -1455,23 +1455,19 @@ function renderHistoryTab() {
   container.className = 'tab-pane';
   container.id = 'tab-history';
 
+  let currentView = 'calendar';
+  let selectedHistoryItem = null;
+  let currentMonth = new Date().getMonth();
+  let currentYear = new Date().getFullYear();
+
   const formatRest = (seconds) => {
     if (!seconds) return '-';
     return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
   };
 
-  const renderContent = (state) => {
-    const history = state.history || [];
-    if (history.length === 0) {
-      container.innerHTML = `
-        <div style="padding: 20px; text-align: center; color: var(--text-secondary); margin-top: 50px;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 16px; opacity: 0.5;"><path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z"/><path d="M14 3v5h5M16 13H8M16 17H8M10 9H8"/></svg>
-          <p>아직 저장된 운동 기록이 없습니다.</p>
-          <p style="font-size: 0.85rem; margin-top: 8px;">운동을 완료하면 이곳에 일지가 기록됩니다.</p>
-        </div>
-      `;
-      return;
-    }
+  const renderDetailTable = (historyArray) => {
+    const history = historyArray;
+    if (history.length === 0) return '';
 
     let maxExercises = 0;
     history.forEach(h => {
@@ -1484,16 +1480,24 @@ function renderHistoryTab() {
 
     let html = `
       <div style="padding: 16px; padding-bottom: 80px;">
-        <h2 style="margin-bottom: 16px; font-size: 1.25rem;">운동 기록 일지</h2>
+        <div style="display: flex; align-items: center; margin-bottom: 16px;">
+          <button id="btn-back-calendar" class="btn btn-secondary" style="width: auto; padding: 8px 16px; margin-right: 16px;">&larr; 달력으로</button>
+          <h2 style="margin: 0; font-size: 1.25rem;">기록 상세</h2>
+        </div>
         <div style="overflow-x: auto; background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border-color);">
           <table style="width: max-content; border-collapse: collapse; text-align: center; font-size: 0.85rem;">
             <thead>
               <tr style="background: var(--bg-color); border-bottom: 3px solid var(--border-color);">
                 <th colspan="2" style="padding: 12px 8px; border-right: 3px solid var(--border-color); position: sticky; left: 0; background: var(--bg-color); z-index: 10;">일자</th>
                 ${history.map(h => {
-                  let d = h.date.replace(/\.\s/g, '/').replace(/\./g, '');
-                  if (d.length <= 5) d = new Date().getFullYear() + '/' + d;
-                  return `<th colspan="2" style="padding: 12px 4px; border-right: 1px solid var(--border-color); min-width: 90px;">${d}</th>`;
+                  let dStr = h.date;
+                  try {
+                    let dObj = new Date(h.date.replace(/\./g, '/').replace(/\-/g, '/'));
+                    if (!isNaN(dObj.getTime())) {
+                      dStr = `${dObj.getFullYear()}/${dObj.getMonth()+1}/${dObj.getDate()}`;
+                    }
+                  } catch(e) {}
+                  return `<th colspan="2" style="padding: 12px 4px; border-right: 1px solid var(--border-color); min-width: 90px;">${dStr}</th>`;
                 }).join('')}
               </tr>
               <tr style="background: var(--bg-color); border-bottom: 3px solid var(--border-color);">
@@ -1603,9 +1607,150 @@ function renderHistoryTab() {
         </div>
       </div>
     `;
-
-    container.innerHTML = html;
+    return html;
   };
+
+  const renderCalendar = (history) => {
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    
+    let html = `
+      <div style="padding: 16px; padding-bottom: 80px; display: flex; flex-direction: column; align-items: center;">
+        <div style="display: flex; justify-content: space-between; width: 100%; max-width: 600px; align-items: center; margin-bottom: 20px;">
+          <button id="cal-prev" class="btn btn-secondary" style="width: 40px; height: 40px; padding: 0;">&lt;</button>
+          <h2 style="margin: 0; font-size: 1.25rem;">${currentYear}년 ${currentMonth + 1}월</h2>
+          <button id="cal-next" class="btn btn-secondary" style="width: 40px; height: 40px; padding: 0;">&gt;</button>
+        </div>
+        
+        <div style="width: 100%; max-width: 600px; display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center;">
+          <div style="font-weight: bold; padding: 8px 0; color: var(--danger-color);">일</div>
+          <div style="font-weight: bold; padding: 8px 0;">월</div>
+          <div style="font-weight: bold; padding: 8px 0;">화</div>
+          <div style="font-weight: bold; padding: 8px 0;">수</div>
+          <div style="font-weight: bold; padding: 8px 0;">목</div>
+          <div style="font-weight: bold; padding: 8px 0;">금</div>
+          <div style="font-weight: bold; padding: 8px 0; color: var(--primary-color);">토</div>
+    `;
+
+    for (let i = 0; i < firstDay; i++) {
+      html += `<div style="padding: 8px;"></div>`;
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${currentYear}/${String(currentMonth + 1).padStart(2, '0')}/${String(d).padStart(2, '0')}`;
+      
+      const dayHistoryItems = history.filter(h => {
+        try {
+          let dateString = h.date.replace(/\./g, '/').replace(/\-/g, '/');
+          let dObj = new Date(dateString);
+          if (isNaN(dObj.getTime())) {
+            let parts = h.date.split(/[\.\/\s\-]+/).filter(Boolean);
+            if (parts.length >= 3) {
+              let y = parts[0].length === 4 ? parts[0] : parts[2].length === 4 ? parts[2] : new Date().getFullYear();
+              let m = parts[0].length === 4 ? parts[1] : parts[0];
+              let day = parts[0].length === 4 ? parts[2] : parts[1];
+              dObj = new Date(`${y}/${m}/${day}`);
+            }
+          }
+          if (!isNaN(dObj.getTime())) {
+            return dObj.getFullYear() === currentYear && dObj.getMonth() === currentMonth && dObj.getDate() === d;
+          }
+        } catch (e) {}
+        return false;
+      });
+
+      const todayStr = `${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${String(new Date().getDate()).padStart(2, '0')}`;
+      const isToday = dateStr === todayStr;
+      
+      let bg = 'var(--card-bg)';
+      let border = '1px solid var(--border-color)';
+      let cursor = 'default';
+      let content = `<span style="font-weight: ${isToday ? 'bold' : 'normal'}; margin-bottom: 4px; ${isToday ? 'color: var(--primary-color);' : ''}">${d}</span>`;
+      let historyIdxAttr = '';
+
+      if (dayHistoryItems.length > 0) {
+        bg = 'var(--bg-color)';
+        border = '2px solid var(--primary-color)';
+        cursor = 'pointer';
+        
+        const hItem = dayHistoryItems[dayHistoryItems.length - 1]; // Use last workout if multiple
+        const hIdx = history.indexOf(hItem);
+        historyIdxAttr = `data-history-idx="${hIdx}"`;
+        
+        let routinesHtml = '';
+        dayHistoryItems.forEach(item => {
+           routinesHtml += `<span style="font-size: 0.7rem; color: var(--primary-color); word-break: keep-all; line-height: 1.1; margin-top: 2px;">${item.routineName}</span>`;
+        });
+
+        content += `<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1;">${routinesHtml}</div>`;
+      }
+
+      html += `
+        <div class="cal-day" ${historyIdxAttr} style="border: ${border}; border-radius: 8px; padding: 4px; min-height: 80px; display: flex; flex-direction: column; align-items: center; cursor: ${cursor}; background: ${bg}; transition: all 0.2s;">
+          ${content}
+        </div>
+      `;
+    }
+
+    html += `
+        </div>
+      </div>
+    `;
+    return html;
+  };
+
+  const renderContent = (state) => {
+    const history = state.history || [];
+    if (currentView === 'calendar') {
+      container.innerHTML = renderCalendar(history);
+    } else if (currentView === 'detail' && selectedHistoryItem) {
+      try {
+        container.innerHTML = renderDetailTable([selectedHistoryItem]);
+      } catch (e) {
+        alert("표 렌더링 에러: " + e.message);
+        currentView = 'calendar';
+        container.innerHTML = renderCalendar(history);
+      }
+    }
+  };
+
+  container.addEventListener('click', (e) => {
+    const state = store.state;
+    
+    const calDay = e.target.closest('.cal-day');
+    if (calDay && currentView === 'calendar') {
+      const hIdx = calDay.getAttribute('data-history-idx');
+      if (hIdx !== null && hIdx !== '') {
+        const idx = parseInt(hIdx, 10);
+        if (state.history && state.history[idx]) {
+          selectedHistoryItem = state.history[idx];
+          currentView = 'detail';
+          renderContent(state);
+        }
+      }
+    }
+    
+    const btnBack = e.target.closest('#btn-back-calendar');
+    if (btnBack && currentView === 'detail') {
+      currentView = 'calendar';
+      selectedHistoryItem = null;
+      renderContent(state);
+    }
+    
+    const btnPrev = e.target.closest('#cal-prev');
+    if (btnPrev && currentView === 'calendar') {
+      currentMonth--;
+      if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+      renderContent(state);
+    }
+    
+    const btnNext = e.target.closest('#cal-next');
+    if (btnNext && currentView === 'calendar') {
+      currentMonth++;
+      if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+      renderContent(state);
+    }
+  });
 
   store.subscribe((state) => {
     if (container.classList.contains('active')) {
@@ -1617,7 +1762,6 @@ function renderHistoryTab() {
   container.forceRender = () => renderContent(store.state);
   return container;
 }
-
 
 // --- Main App Logic ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -1663,6 +1807,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+
+
+
+
+
+
+
+
 
 
 
